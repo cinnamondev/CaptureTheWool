@@ -1,0 +1,11 @@
+package com.github.cinnamondev.captureTheWool;
+
+import io.papermc.paper.plugin.bootstrap.BootstrapContext;
+import io.papermc.paper.plugin.bootstrap.PluginBootstrap;
+
+public class CtwBootstrap implements PluginBootstrap {
+    @Override
+    public void bootstrap(BootstrapContext context) {
+
+    }
+}

@@ -1,0 +1,37 @@
+
+
+teams:
+  GREEN_WOOL:
+    display_name: "Greens" # team name
+    colour: GREEN # team display colour
+  YELLOW_WOOL:
+    display_name: "Yellows"
+    colour: YELLOW
+  RED_WOOL:
+    display_name: "Reds"
+    colour: RED
+  BLUE_WOOL:
+    display_name: "Blues"
+    colour: BLUE
+
+unclaimed-colour: GRAY
+unclaimed-material: LIGHT_GRAY
+
+contested-claims:
+  # set to -1 to disable timeout contesting
+  timeout: 6000 # in ticks (20 / s)
+  # in the case multiple teams attack another teams wool, the defending team's colour is entirely replaced on the cube, but
+  # there is a contest on who claims the wool, enabling this behaviour will set the wool to unclaimed after the timeout
+  # set to false to have it change wool state to an under attack state (except that the dominant team is the new
+  # 'current claimer' and everyone else is an attacker.
+  #
+  # default: true
+  revert-multi-claims-to-unclaimed: true
+
+# spawns an end gateway
+reveal-wools:
+  enabled: true
+  gateway-duration: 40 # ticks
+  gateway-interval: 2000
+
+scrambler:
