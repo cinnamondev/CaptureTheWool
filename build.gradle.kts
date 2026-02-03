@@ -45,7 +45,7 @@ tasks {
     }
     runServer {
         downloadPlugins {
-            modrinth("worldedit", "7.4.0-beta-01")
+            //modrinth("worldedit", "7.4.0-beta-01")
             //modrinth("discordsrv", "1.30.2") //  for discordsrv integration testing.
             modrinth("luckperms", "v5.5.17-bukkit")
         }

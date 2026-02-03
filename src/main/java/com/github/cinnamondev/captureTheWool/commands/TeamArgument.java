@@ -28,7 +28,7 @@ public final class TeamArgument implements CustomArgumentType.Converted<TeamMeta
 
     @Override
     public TeamMeta convert(String nativeType) throws CommandSyntaxException {
-        TeamMeta meta = p.teams.get(nativeType);
+        TeamMeta meta = p.teams.get(Material.matchMaterial(nativeType));
         if (meta == null) { throw ERROR_INVALID_TEAM_NAME.create(nativeType); }
         return meta;
     }

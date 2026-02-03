@@ -7,22 +7,23 @@ import org.bukkit.event.Cancellable;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
-public class CubeAttackEvent extends Event implements Cancellable {
-    private WoolCube cube;
-    private Player attacker;
+public class CubeAttackEvent extends StateChangeEvent implements Cancellable {
     private TeamMeta attackingTeam;
-    public CubeAttackEvent(WoolCube cube, Player attacker, TeamMeta attackingTeam) {
-        this.cube = cube;
-        this.attacker = attacker;
+    public TeamMeta attackingTeam() { return attackingTeam; }
+    public CubeAttackEvent(WoolCube cube, @Nullable WoolCube.State previous, WoolCube.State.UnderAttack newState, TeamMeta attackingTeam) {
+        super(cube, previous, newState);
         this.attackingTeam = attackingTeam;
+        attackingTeam.scoreboardTeam();
     }
 
-    private boolean cancelled = false;
-    @Override public boolean isCancelled() { return cancelled; }
-    @Override public void setCancelled(boolean cancel) { this.cancelled = cancel; }
+    @Override
+    public WoolCube.State.UnderAttack newState() {
+        return (WoolCube.State.UnderAttack) super.newState();
+    }
 
     private static final HandlerList HANDLER_LIST = new HandlerList();
-    public static HandlerList getHandlerList() { return HANDLER_LIST;}
+    public static HandlerList getHandlerList() { return HANDLER_LIST; }
     @Override public HandlerList getHandlers() { return HANDLER_LIST; }
 }

@@ -1,11 +1,16 @@
 package com.github.cinnamondev.captureTheWool;
 
+import com.github.cinnamondev.captureTheWool.events.CubeAttackEvent;
+import com.github.cinnamondev.captureTheWool.events.CubeClaimedEvent;
 import com.github.cinnamondev.captureTheWool.events.StateChangeEvent;
 import com.github.cinnamondev.captureTheWool.util.BlockUtil;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.ComponentBuilder;
 import net.kyori.adventure.text.JoinConfiguration;
+import net.kyori.adventure.text.TextComponent;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.event.HoverEvent;
+import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.Style;
 import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.format.TextDecoration;
@@ -25,6 +30,7 @@ import org.bukkit.scoreboard.Team;
 import javax.annotation.Nullable;
 import javax.xml.stream.events.StartElement;
 import java.net.http.WebSocket;
+import java.text.DecimalFormat;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -39,26 +45,39 @@ public class WoolCube implements Listener {
 
     private final CaptureTheWool p;
     final Location root;
-    final Location respawnLocation;
-    protected State cubeState;
+    public final Location respawnLocation;
+    private final Component displayName;
+    public Component displayName() {
+        NamedTextColor color = switch (cubeState) {
+            case State.Claimed(TeamMeta claimer, boolean _cd) -> claimer.colour();
+            case State.UnderAttack(TeamMeta claimer, ArrayList<TeamMeta> attackers) when claimer != null -> claimer.colour();
+            case null, default -> p.unclaimedColour;
+        };
+        return displayName.color(color);
+    }
+    public State cubeState;
     protected boolean updateCubeState(State newState) {
-        var e = new StateChangeEvent(this, cubeState, newState);
+        StateChangeEvent e;
+        if (newState instanceof State.UnderAttack attackState && !(cubeState instanceof State.UnderAttack)) {
+            // initial attack!
+            e = new CubeAttackEvent(this, cubeState, attackState, attackState.attackers.getFirst());
+        } else if (newState instanceof State.Claimed claimedState && !(cubeState instanceof State.Claimed)) {
+            e = new CubeClaimedEvent(this, cubeState, claimedState);
+        } else {
+            e = new StateChangeEvent(this, cubeState, newState);
+        }
+
         boolean updated = e.callEvent();
         if (updated) {
-            p.getLogger().info("updated cube state from " + cubeState.toString() + " to " + newState.toString());
+            p.getLogger().info("updated cube state from " + (cubeState != null ? cubeState.getClass().getName() : "none") + " to " + newState.getClass().getName() );
             this.cubeState = newState; // if not cancelled update
         }
         return updated;
     }
     protected final Set<Location> woolLocations;
-    public WoolCube(CaptureTheWool p, Location root, @Nullable TeamMeta currentOwner) {
+    public WoolCube(CaptureTheWool p, Location root, Component displayName, @Nullable TeamMeta currentOwner) {
         this.p = p;
-
-        if (currentOwner == null) {
-            updateCubeState(new State.Unclaimed());
-        } else {
-            updateCubeState(new State.Claimed(currentOwner, false));
-        }
+        this.displayName = displayName;
 
         this.root = root;
         this.respawnLocation = root.add(0, 4, 0);
@@ -69,46 +88,69 @@ public class WoolCube implements Listener {
             Chunk chunk = woolLocation.getChunk();
             world.setChunkForceLoaded(chunk.getX(), chunk.getZ(), true);
         }
+        
+        if (currentOwner == null) {
+            updateCubeState(new State.Unclaimed());
+        } else {
+            updateCubeState(new State.Claimed(currentOwner, false));
+        }
     }
 
     @EventHandler
     public void playerBreakBlock(BlockBreakEvent e) {
-        if (woolLocations.contains(e.getBlock().getLocation())) {
+        if (!woolLocations.contains(e.getBlock().getLocation())) {
             return;
         }
 
-        e.setCancelled(true);
         Player player = e.getPlayer();
-        Material m = p.assignedTeams.get(player.getUniqueId());
-        if (m == null) {
-            p.getLogger().info("Player " + player.getUniqueId().toString() + " has no wool team, ignoring");
+        TeamMeta team = p.getPlayerTeam(player);
+        if (team == null) {
+            p.getLogger().info("Player " + player.getName() + " has no wool team, ignoring");
             return;
         }
-        TeamMeta team = Objects.requireNonNull(p.teams.get(m));
+        Material m = team.woolColour();
+
+        e.setCancelled(true);
+        Material oldColour = e.getBlock().getType();
 
         State previousState = cubeState;
         State newState;
-        switch (cubeState) {
+        boolean updated = switch (cubeState) {
             case State.Claimed(TeamMeta currentClaimer, boolean _cooldown) -> {
-                updateCubeState(new State.UnderAttack(currentClaimer, new ArrayList<>(Collections.singleton(team))));
-                // we are now under attack
+                if (!currentClaimer.equals(team)) {
+                    yield updateCubeState(new State.UnderAttack(currentClaimer, new ArrayList<>(Collections.singleton(team))));
+                    // we are now under attack
+                } else { yield false; } // currnet claimer same
             }
             case State.UnderAttack(TeamMeta currentClaimer, ArrayList<TeamMeta> attackers) -> {
                 // add to attackers if not already, check dominant material otherwise
-                if (attackers.contains(team) && getMaterialCountFor(team) == 25) {
+                if (getMaterialCountFor(m) == 24 && e.getBlock().getType() != m) { // is a non team block and one more to go. by omission this is the last block.
                     // this attacker has claimed the cube now
-                    updateCubeState(new State.Claimed(currentClaimer, true));
-                    p.getServer().getScheduler().runTaskLater(p, () -> {
-                        updateCubeState(new State.Claimed(currentClaimer, false));
-                    }, 200);
-                } else {
+                    boolean isClaimAccepted = updateCubeState(new State.Claimed(team, true));
+                    if (isClaimAccepted) {
+                        p.getServer().getScheduler().runTaskLater(p, () -> {
+                            updateCubeState(new State.Claimed(team, false));
+                        }, 200);
+                    }
+                    yield isClaimAccepted;
+                } else if (!attackers.contains(team) && !Objects.equals(currentClaimer, team)) {
                     attackers.add(team);
                 }
+                yield true;
             }
             case State.Unclaimed _unclaimed -> {
-                updateCubeState(new State.Claimed(team, false));
+                if (updateCubeState(new State.Claimed(team, false))) {
+                    woolLocations.forEach(l -> l.getBlock().setType(m));
+                    yield true;
+                } else { yield false; }
             }
         };
+
+        if (updated) {
+            e.getBlock().setType(m);
+        } else {
+            e.getBlock().setType(oldColour);
+        }
     }
 
 
@@ -125,9 +167,12 @@ public class WoolCube implements Listener {
     public void spawnCube() {
         // create 3x3 region around point and fill with material.
         World world = root.getWorld();
-        Material m = (cubeState instanceof State.Claimed(TeamMeta claimer, boolean _cd))
-                ? claimer.woolColour()
-                : p.teams.get(null).woolColour();
+        Material m = switch (cubeState) {
+            case State.Claimed(TeamMeta claimer, boolean _cd) -> claimer.woolColour();
+            case State.UnderAttack(TeamMeta claimer, ArrayList<TeamMeta> attackers) -> claimer.woolColour();
+            case State.Unclaimed unclaimed -> p.unclaimedMaterial;
+        };
+
         for (Location woolLocation : woolLocations) {
             if (!woolLocation.isChunkLoaded() && !woolLocation.getChunk().load(false)) {
                 throw new RuntimeException("failed ot load chunk while trying to spawn wool cube at " + woolLocation);
@@ -138,39 +183,58 @@ public class WoolCube implements Listener {
 
     // for commands.
     public Component cubeBrief() {
-        Component loreText;
-        Style style;
-        switch (cubeState) {
-            case State.Claimed(TeamMeta claimer, boolean cooldown) -> {
-                style = Style.style(claimer.colour());
-                loreText = Component.text("Claimed by " + claimer.scoreboardTeam().getName() + ".")
-                        .appendNewline()
-                        .append(Component.text(cooldown ? "Players can respawn here." : "Players cannot respawn here."));
-            }
-            case State.Unclaimed unclaimed -> {
-                style = Style.style(p.unclaimedColour);
-                loreText = Component.text("Unclaimed!");
-            }
-            case State.UnderAttack(TeamMeta claimer, ArrayList<TeamMeta> attackers) -> {
-                style = Style.style(claimer.colour(), TextDecoration.BOLD);
-                loreText = Component.text("Under attack by: ")
-                        .append(Component.join(JoinConfiguration.newlines(),
-                                attackers.stream().map(TeamMeta::name).toList()
-                        ));
-            }
-        }
-        return Component.text("[" + root.getX() + " " + root.getY() + " " + root.getZ() + "]")
+        Style style = switch (cubeState) {
+            case State.Claimed(TeamMeta claimer, boolean cooldown) -> Style.style(claimer.colour());
+            case State.UnderAttack attackState -> Style.style(attackState.claimer().colour(), TextDecoration.BOLD);
+            case null,default -> Style.style(p.unclaimedColour);
+        };
+        return Component.text("[" + root.getBlockX() + " " + root.getBlockY() + " " + root.getBlockZ() + "]")
                 .style(style)
-                .hoverEvent(HoverEvent.showText(loreText))
-                .clickEvent(ClickEvent.suggestCommand("/ctw cube at " + root.getX() + " " + root.getY() + " " + root.getZ() + " "));
+                .hoverEvent(HoverEvent.showText(lore()))
+                .clickEvent(ClickEvent.suggestCommand("/ctw cube at " + root.getBlockX() + " " + root.getBlockY() + " " + root.getBlockZ() + " " + root.getWorld() + " "));
+    }
+
+    public Component lore() {
+        return switch (cubeState) {
+            case State.Claimed(TeamMeta claimer, boolean cooldown) ->
+                    Component.text("Claimed by " + claimer.scoreboardTeam().getName() + ".")
+                        .appendNewline()
+                        .append(Component.text(cooldown ? "Players cannot respawn here." : "Players can respawn here."));
+            case State.UnderAttack attackState -> underAttackInfo(this, attackState);
+            case null,default -> Component.text("Unclaimed!");
+        };
+    }
+    private static final DecimalFormat df = new DecimalFormat("#.##%");
+    public static Component underAttackInfo(WoolCube cube, State.UnderAttack state) {
+        var countMap = cube.materialCountMap();
+        TeamMeta currentClaimer = state.claimer();
+        var ratioCurrent = df.format(countMap.get(currentClaimer.woolColour()) / 25f);
+        Component percentageList = Component.join(
+                JoinConfiguration.newlines(),
+                state.attackers().stream()
+                        .map(t -> t.name()
+                                .append(Component.text(" (" + df.format(countMap.get(t.woolColour()) / 25f) + ")"))
+                                .color(t.colour())
+                        )
+                        .toList()
+        );
+
+        return Component.join(JoinConfiguration.newlines(),
+                Component.text("Under attack!"),
+                Component.text("Claiming team: ")
+                        .append(currentClaimer.name())
+                        .append(Component.text(" (" + ratioCurrent + ")")),
+                Component.text("Attacking teams: "),
+                percentageList
+        );
     }
     static Set<Location> allWallBlocks(Location root) {
         Set<Location> locations = new HashSet<>();
-        for (double x = -1; x <= 1; x++) {
-            for (double y = -1; y <= 1; y++) {
-                for (double z = -1; z <= 1; z++) {
+        for (int x = -1; x <= 1; x+=1) {
+            for (int y = -1; y <= 1; y+=1) {
+                for (int z = -1; z <= 1; z+=1) {
                     if (x==0 && y!=1 && z==0) { continue;}
-                    locations.add(root.add(x, y, z));
+                    locations.add(new Location(root.getWorld(), root.blockX() + x, root.blockY() + y, root.blockZ() + z).toBlockLocation());
                 }
             }
         }
@@ -186,20 +250,17 @@ public class WoolCube implements Listener {
                 .map(Block::getType)
                 .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
     }
-    public boolean isWallsAllMadeOf(Material material) {
-        return getAllMaterialsOnWalls().allMatch(m -> m == material);
-    }
     public Material getDominantMaterial() {
         return materialCountMap().entrySet().stream()
                 .max(Map.Entry.comparingByValue())
                 .map(Map.Entry::getKey)
                 .orElseThrow();
     }
-    public int getMaterialCountFor(TeamMeta team) {
+    public int getMaterialCountFor(Material m) {
         return woolLocations.stream()
                 .map(Location::getBlock)
                 .map(Block::getType)
-                .filter(b -> b.equals(team.woolColour()))
+                .filter(m2 -> m2 == m)
                 .toList()
                 .size();
     }
@@ -210,6 +271,11 @@ public class WoolCube implements Listener {
 
         p.getServer().getScheduler().runTaskLater(p, task -> {
             skyBlock.getBlock().setType(Material.AIR);
-        }, 20);
+        }, 100);
+    }
+
+    public static Optional<WoolCube> getNearestCube(Location current, List<WoolCube> cubes) {
+        if (cubes.isEmpty()) { return Optional.empty(); }
+        return cubes.stream().min(Comparator.comparing(c -> c.respawnLocation.distanceSquared(current)));
     }
 }
