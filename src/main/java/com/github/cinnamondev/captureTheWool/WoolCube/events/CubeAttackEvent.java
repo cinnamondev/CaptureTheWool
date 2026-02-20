@@ -1,26 +1,24 @@
-package com.github.cinnamondev.captureTheWool.events;
+package com.github.cinnamondev.captureTheWool.WoolCube.events;
 
 import com.github.cinnamondev.captureTheWool.TeamMeta;
-import com.github.cinnamondev.captureTheWool.WoolCube;
-import org.bukkit.entity.Player;
+import com.github.cinnamondev.captureTheWool.WoolCube.CubeState;
+import com.github.cinnamondev.captureTheWool.WoolCube.WoolCube;
 import org.bukkit.event.Cancellable;
-import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 public class CubeAttackEvent extends StateChangeEvent implements Cancellable {
     private TeamMeta attackingTeam;
     public TeamMeta attackingTeam() { return attackingTeam; }
-    public CubeAttackEvent(WoolCube cube, @Nullable WoolCube.State previous, WoolCube.State.UnderAttack newState, TeamMeta attackingTeam) {
+    public CubeAttackEvent(WoolCube cube, @Nullable CubeState previous, CubeState.UnderAttack newState, TeamMeta attackingTeam) {
         super(cube, previous, newState);
         this.attackingTeam = attackingTeam;
         attackingTeam.scoreboardTeam();
     }
 
     @Override
-    public WoolCube.State.UnderAttack newState() {
-        return (WoolCube.State.UnderAttack) super.newState();
+    public CubeState.UnderAttack newState() {
+        return (CubeState.UnderAttack) super.newState();
     }
 
     private static final HandlerList HANDLER_LIST = new HandlerList();

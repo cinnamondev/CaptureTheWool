@@ -1,7 +1,8 @@
-package com.github.cinnamondev.captureTheWool.events;
+package com.github.cinnamondev.captureTheWool.WoolCube.events;
 
 import com.github.cinnamondev.captureTheWool.TeamMeta;
-import com.github.cinnamondev.captureTheWool.WoolCube;
+import com.github.cinnamondev.captureTheWool.WoolCube.CubeState;
+import com.github.cinnamondev.captureTheWool.WoolCube.WoolCube;
 import org.bukkit.event.Cancellable;
 import org.bukkit.event.HandlerList;
 import org.jetbrains.annotations.Nullable;
@@ -10,13 +11,13 @@ import java.util.ArrayList;
 import java.util.Optional;
 
 public class CubeClaimedEvent extends StateChangeEvent implements Cancellable {
-    public CubeClaimedEvent(WoolCube cube, @Nullable WoolCube.State previous, WoolCube.State.Claimed newState) {
+    public CubeClaimedEvent(WoolCube cube, @Nullable CubeState previous, CubeState.Claimed newState) {
         super(cube, previous, newState);
     }
 
     @Override
-    public WoolCube.State.Claimed newState() {
-        return (WoolCube.State.Claimed) super.newState();
+    public CubeState.Claimed newState() {
+        return (CubeState.Claimed) super.newState();
     }
 
     public TeamMeta newClaimers() {
@@ -25,8 +26,8 @@ public class CubeClaimedEvent extends StateChangeEvent implements Cancellable {
 
     public Optional<TeamMeta> oldClaimers() {
         return switch (previousState()) {
-            case WoolCube.State.Claimed(TeamMeta claimer, boolean _cd) -> Optional.of(claimer);
-            case WoolCube.State.UnderAttack(TeamMeta claimer, ArrayList<TeamMeta> _att) -> Optional.ofNullable(claimer);
+            case CubeState.Claimed(TeamMeta claimer, boolean _cd) -> Optional.of(claimer);
+            case CubeState.UnderAttack(TeamMeta claimer, ArrayList<TeamMeta> _att) -> Optional.ofNullable(claimer);
             case null, default -> Optional.empty();
         };
     }

@@ -1,6 +1,9 @@
 package com.github.cinnamondev.captureTheWool;
 
+import com.github.cinnamondev.captureTheWool.WoolCube.CubeState;
+import com.github.cinnamondev.captureTheWool.WoolCube.WoolCube;
 import com.github.cinnamondev.captureTheWool.commands.CtwCommand;
+import com.github.cinnamondev.captureTheWool.items.RespawnCompass;
 import com.github.cinnamondev.captureTheWool.util.ColourConverter;
 import io.papermc.paper.command.brigadier.Commands;
 import io.papermc.paper.math.BlockPosition;
@@ -11,30 +14,49 @@ import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.OfflinePlayer;
-import org.bukkit.entity.Player;
+import org.bukkit.configuration.Configuration;
+import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.configuration.serialization.ConfigurationSerializable;
+import org.bukkit.configuration.serialization.ConfigurationSerialization;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scoreboard.*;
 
 import javax.annotation.Nullable;
+import java.io.File;
+import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
 public final class CaptureTheWool extends JavaPlugin {
-    public Material unclaimedMaterial;
-    public NamedTextColor unclaimedColour;
+    public static Material UNCLAIMED_MATERIAL;
+    public static NamedTextColor UNCLAIMED_COLOUR;
+    public RespawnCompass compass;
 
+    private final File file = new File(this.getDataFolder(), "save.yml");
     //public Map<UUID, Material> assignedTeams = new HashMap<>();
     public @Nullable TeamMeta getPlayerTeam(OfflinePlayer player) {
         Team team = getServer().getScoreboardManager().getMainScoreboard().getPlayerTeam(player);
+        if (team == null) { return null; }
         return teamByName.get(team.getName());
     }
 
+    private YamlConfiguration save;
+    public void loadSave() {
+        this.save = YamlConfiguration.loadConfiguration(file);
+    }
+    public Configuration getSave() { return save; }
+    public void save() {
+        try {
+            save.save(file);
+        } catch (IOException e) {
+            getLogger().severe(e.getMessage());
+        }
+    }
 
-
-    public HashMap<UUID, WoolCube> setRespawnLocations = new HashMap<>();
-    public Map<Material, TeamMeta> teams = new HashMap<>();
-    public Map<String, TeamMeta> teamByName = new HashMap<>();
-    public HashSet<WoolCube> cubes = new HashSet<>();
+    static public HashMap<UUID, WoolCube> setRespawnLocations = new HashMap<>();
+    static public Map<Material, TeamMeta> teams = new HashMap<>();
+    static public Map<String, TeamMeta> teamByName = new HashMap<>();
+    static public HashSet<WoolCube> cubes = new HashSet<>();
     public void addCube(WoolCube cube) {
         this.getServer().getPluginManager().registerEvents(cube, this);
         cubes.add(cube);
@@ -56,12 +78,10 @@ public final class CaptureTheWool extends JavaPlugin {
     }
     public List<WoolCube> getRespawnCandidatesFor(TeamMeta team) {
         return cubes.stream().filter(cube ->
-                cube.cubeState instanceof WoolCube.State.Claimed(TeamMeta cubeTeam, boolean canRespawn)
+                cube.cubeState instanceof CubeState.Claimed(TeamMeta cubeTeam, boolean canRespawn)
                 && canRespawn && team.equals(cubeTeam)
         ).toList();
     }
-    public NamedTextColor color = NamedTextColor.YELLOW;
-
     public Map<Material, TeamMeta> discoverTeams(boolean remakeTeams) {
         Scoreboard scoreboard = getServer().getScoreboardManager().getMainScoreboard();
         MiniMessage mm = MiniMessage.miniMessage();
@@ -96,14 +116,9 @@ public final class CaptureTheWool extends JavaPlugin {
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     }
 
-    // TODO: FUTURE. OBJECTIVE KEEPING??
-    public void createObjectives(boolean recreate) {
-        Scoreboard sb = getServer().getScoreboardManager().getMainScoreboard();
-        Objective woolBreaks = sb.registerNewObjective("woolBreaks", Criteria.TRIGGER, Component.text("Wool breaks"));
-        Objective woolRepairs = sb.registerNewObjective("woolRepairs", Criteria.TRIGGER, Component.text("Wool fixes"));
-    }
     @Override
     public void onEnable() {
+        CubeState.registerConfiguration();
         saveDefaultConfig();
         reloadConfig();
 
@@ -112,26 +127,39 @@ public final class CaptureTheWool extends JavaPlugin {
                 .map(t -> Map.entry(t.scoreboardTeam().getName(), t))
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
-        this.unclaimedMaterial = Material.matchMaterial(
+        this.UNCLAIMED_MATERIAL = Material.matchMaterial(
                 getConfig().getString("unclaimed-material", "LIGHT_GRAY")
         );
-        if (unclaimedMaterial == null) { this.unclaimedMaterial = Material.LIGHT_GRAY_WOOL; }
-        this.unclaimedColour = ColourConverter.namedColourFromString(
+        if (UNCLAIMED_MATERIAL == null) { this.UNCLAIMED_MATERIAL = Material.LIGHT_GRAY_WOOL; }
+        this.UNCLAIMED_COLOUR = ColourConverter.namedColourFromString(
                 getConfig().getString("unclaimed-colour", "GRAY"),
                 NamedTextColor.GRAY
         );
 
-        getServer().getPluginManager().registerEvents(new PlayerNotifier(), this);
+        loadSave();
 
-        CtwCommand cmd = new CtwCommand(this);
-        getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS, e  -> {
-            Commands commands = e.registrar();
-            commands.register(
-                    cmd.command(),
-                    "capture the wool",
-                    Collections.singleton("capturethewool")
-            );
-        });
+        CubeState state = getSave().getObject("state", CubeState.class);
+        getLogger().info(state.toString());
+        CubeState state2 = new CubeState.Claimed(
+                teamByName.values().stream().findFirst().orElseThrow(),
+                false
+        );
+        getSave().set("state", state2);
+        save();
+
+        return;
+
+        //getServer().getPluginManager().registerEvents(new PlayerNotifier(), this);
+
+        //CtwCommand cmd = new CtwCommand(this);
+        //getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS, e  -> {
+        //    Commands commands = e.registrar();
+        //    commands.register(
+        //            cmd.command(),
+        //            "capture the wool",
+        //            Collections.singleton("capturethewool")
+        //    );
+        //});
         // Plugin startup logic
 
     }

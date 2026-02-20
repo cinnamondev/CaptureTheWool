@@ -1,7 +1,8 @@
 package com.github.cinnamondev.captureTheWool;
 
-import com.github.cinnamondev.captureTheWool.events.CubeAttackEvent;
-import com.github.cinnamondev.captureTheWool.events.CubeClaimedEvent;
+import com.github.cinnamondev.captureTheWool.WoolCube.events.CubeAttackEvent;
+import com.github.cinnamondev.captureTheWool.WoolCube.events.CubeClaimedEvent;
+import com.github.cinnamondev.captureTheWool.WoolCube.events.CubeDamageEvent;
 import net.kyori.adventure.key.Key;
 import net.kyori.adventure.sound.Sound;
 import net.kyori.adventure.text.Component;
@@ -57,5 +58,10 @@ public class PlayerNotifier implements Listener {
         e.newClaimers().playSound(SOUND_CLAIMED_CUBE_DISTANCE, Sound.Emitter.self());
 
         e.newClaimers().sendMessage(Component.text("You have claimed ").append(e.cube().displayName()));
+    }
+
+    @EventHandler
+    public void onDamage(CubeDamageEvent e) {
+        e.newState().claimer().showBossBar(e.cube().bossBar());
     }
 }

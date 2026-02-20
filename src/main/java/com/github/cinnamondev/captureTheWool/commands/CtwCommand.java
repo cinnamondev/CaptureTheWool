@@ -2,12 +2,11 @@ package com.github.cinnamondev.captureTheWool.commands;
 
 import com.github.cinnamondev.captureTheWool.CaptureTheWool;
 import com.github.cinnamondev.captureTheWool.TeamMeta;
-import com.github.cinnamondev.captureTheWool.WoolCube;
+import com.github.cinnamondev.captureTheWool.WoolCube.WoolCube;
+import com.github.cinnamondev.captureTheWool.items.RespawnCompass;
 import com.mojang.brigadier.Command;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
-import com.mojang.brigadier.exceptions.DynamicCommandExceptionType;
 import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
@@ -15,14 +14,18 @@ import io.papermc.paper.command.brigadier.Commands;
 import io.papermc.paper.command.brigadier.MessageComponentSerializer;
 import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
 import io.papermc.paper.command.brigadier.argument.resolvers.BlockPositionResolver;
+import io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver;
 import io.papermc.paper.math.BlockPosition;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Block;
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.HumanEntity;
 import org.bukkit.entity.Player;
+
+import java.util.List;
 
 public class CtwCommand {
     CaptureTheWool p;
@@ -32,11 +35,12 @@ public class CtwCommand {
 
     public LiteralCommandNode<CommandSourceStack> command() {
         var cubeSubCommand = Commands.literal("cube")
-                .then(Commands.literal("create").then(Commands.argument("name", StringArgumentType.word())
+                .requires(src -> src.getSender().hasPermission("ctw.admin"))
+                .then(Commands.literal("create").then(Commands.argument("name", ArgumentTypes.component())
                         .requires(src -> src.getSender() instanceof Player)
                         .then(Commands.argument("team", new TeamArgument(p))
                                 .executes(ctx -> createCubeExecutor(ctx, true)))
-                        .then(Commands.literal("noTeam")
+                        .then(Commands.literal("unclaimed")
                                 .executes(ctx -> createCubeExecutor(ctx, false)))
                 ))
                 .then(Commands.literal("list")
@@ -67,7 +71,27 @@ public class CtwCommand {
                                     return Command.SINGLE_SUCCESS;
                                 })
                         )
+                )
+                .then(Commands.literal("all")
+                        .then(Commands.literal("reveal").executes(ctx -> {
+                            p.cubes.forEach(WoolCube::revealLocation);
+                            return Command.SINGLE_SUCCESS;
+                        }))
                 );
+
+        var compassCommand = Commands.literal("compass")
+                .then(Commands.literal("give").then(Commands.argument("players", ArgumentTypes.players())
+                        .executes(ctx -> {
+                            final PlayerSelectorArgumentResolver targetResolver = ctx.getArgument("targets", PlayerSelectorArgumentResolver.class);
+                            final List<Player> targets = targetResolver.resolve(ctx.getSource());
+                            final CommandSender sender = ctx.getSource().getSender();
+
+                            for (final Player target : targets) {
+                                target.give(RespawnCompass.createItem());
+                            }
+                            return Command.SINGLE_SUCCESS;
+                        })));
+
         return Commands.literal("ctw")
                 .then(Commands.literal("team")
                         .then(Commands.argument("team", new TeamArgument(p))))
@@ -98,11 +122,9 @@ public class CtwCommand {
         Location loc = resolveLocation(ctx, lookahead);
 
         p.findWoolCubeAt(loc, !lookahead).ifPresentOrElse(
-                cube -> {
-                    cube.revealLocation(p);
-                }, () -> {
-                    ctx.getSource().getSender().sendMessage(Component.text("No cube found!"));
-                });
+                WoolCube::revealLocation,
+                () -> ctx.getSource().getSender().sendMessage(Component.text("No cube found!"))
+        );
         return Command.SINGLE_SUCCESS;
     }
     int createCubeExecutor(CommandContext<CommandSourceStack> ctx, boolean hasTeam) {
@@ -114,7 +136,7 @@ public class CtwCommand {
             meta = ctx.getArgument("team", TeamMeta.class);
         }
 
-        WoolCube cube = new WoolCube(p, loc, Component.text(ctx.getArgument("name", String.class)), meta);
+        WoolCube cube = new WoolCube(p, loc, ctx.getArgument("name", Component.class), meta);
         p.addCube(cube);
         cube.spawnCube();
         player.teleport(loc.add(0, 4, 0));
