@@ -17,8 +17,8 @@ public class StateChangeEvent extends Event implements Cancellable {
     @Override public void setCancelled(boolean cancelled) { this.cancelled = cancelled; }
 
     public enum Reason {
-        CompletedAttack,
-        AttackTimeout,
+        CompletedAttack, // UnderAttack -> Claimed
+        //AttackTimeout,
         RespawnUnlocked,
         AttackUnderway,
         InitialClaim,
@@ -27,10 +27,6 @@ public class StateChangeEvent extends Event implements Cancellable {
 
     private WoolCube cube;
 
-    /**
-     * Cube that is being interacted with. IMPORTANT: cube state will be the previous state.
-     * @return
-     */
     public WoolCube cube() { return this.cube; }
     private @Nullable CubeState previous;
     public CubeState previousState() { return this.previous; }
@@ -78,31 +74,19 @@ public class StateChangeEvent extends Event implements Cancellable {
         return deduceReason(previous, current);
     }
     public static Reason deduceReason(CubeState previous, CubeState current) {
-        if (!(previous instanceof CubeState.UnderAttack)
-                && current instanceof CubeState.UnderAttack) {
-            return Reason.AttackUnderway;
-        }
+        return switch (current) {
+            case CubeState.Claimed(TeamMeta t1, boolean cd1)
+                    when previous instanceof CubeState.Claimed(TeamMeta t2, boolean cd2)
+                    && t1.equals(t2) && !cd1 -> Reason.RespawnUnlocked;
+            case CubeState.Claimed c when previous instanceof CubeState.Unclaimed -> Reason.InitialClaim;
+            case CubeState.Claimed c when previous instanceof CubeState.UnderAttack -> Reason.CompletedAttack;
+            case CubeState.UnderAttack ua when !(previous instanceof CubeState.UnderAttack) -> Reason.AttackUnderway;
+            case null, default -> Reason.Undetermined;
+        };
 
-        if (previous instanceof CubeState.Claimed(TeamMeta claim, boolean oCooldown)
-                && current instanceof CubeState.Claimed(TeamMeta claim2, boolean nCooldown)
-                && !oCooldown && nCooldown) {
-            return Reason.RespawnUnlocked;
-        }
-
-        if (previous instanceof CubeState.Unclaimed && current instanceof CubeState.Claimed) {
-            return Reason.InitialClaim;
-        }
-
-        if (previous instanceof CubeState.UnderAttack && current instanceof CubeState.Claimed) {
-            return Reason.CompletedAttack;
-        }
-
-
-        if (previous instanceof CubeState.UnderAttack
-                && (current instanceof CubeState.UnderAttack || current instanceof CubeState.Unclaimed)) {
-            return Reason.AttackTimeout; // only edge case reason
-        }
-
-        return Reason.Undetermined;
+        //if (previous instanceof CubeState.UnderAttack
+        //        && (current instanceof CubeState.UnderAttack || current instanceof CubeState.Unclaimed)) {
+        //    return Reason.AttackTimeout; // only edge case reason
+        //}
     }
 }

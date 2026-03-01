@@ -29,8 +29,16 @@ contested-claims:
   revert-multi-claims-to-unclaimed: true
 
 # spawns an end gateway
-reveal-wools:
+wool-reveal:
   enabled: true
+  on:
+    CUBE_ATTACK: # Claimed(team1,_) -> UnderAttack(team1, [team2,...])
+      to: ALL # ALL, ATTACKERS, DEFENDERS, PARTIES (attackers + defenders)
+      repeat-for-new-teams: true # fire again when another team comes in.
+    CUBE_INITIAL_CLAIM: # Unclaimed -> Claimed(_,_)
+      to: ALL
+    CUBE_DEFEND: # UnderAttack(team1, [team2,...]) -> Claimed(team1,_)
+      to: PARTIES
   gateway-duration: 40 # ticks
   gateway-interval: 2000
 

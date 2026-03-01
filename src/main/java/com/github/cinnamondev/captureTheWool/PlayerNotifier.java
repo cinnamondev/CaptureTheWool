@@ -15,6 +15,7 @@ import org.bukkit.event.Listener;
 
 
 public class PlayerNotifier implements Listener {
+
     private static final Sound SOUND_CLAIMED_LOSS_CLOSE = Sound.sound(Key.key("entity.allay.death"), Sound.Source.MASTER, 3f,0.7f);
     private static final Sound SOUND_CLAIMED_LOSS_DISTANT = Sound.sound(Key.key("entity.allay.ambient_without_item"), Sound.Source.MASTER, 1f,0.7f);
     private static final Sound SOUND_CLAIMED_CUBE_CLOSE = Sound.sound(Key.key("block.end_portal.spawn"), Sound.Source.MASTER,3f,1f);
@@ -24,6 +25,7 @@ public class PlayerNotifier implements Listener {
     private static final Sound SOUND_CALL_TO_ARMS = Sound.sound(Key.key("entity.wither.spawn"), Sound.Source.MASTER, 2f,0.95f);
     @EventHandler(priority = EventPriority.MONITOR)
     public void onUnderAttack(CubeAttackEvent e) {
+        if (e.isAdditionalTeamAttacking()) { return; }
         e.newState().claimer().sendMessage(
                 Component.text("Your cube ")
                         .append(e.cube().displayName(), Component.text(" is under attack by "), e.attackingTeam().name())
@@ -46,7 +48,7 @@ public class PlayerNotifier implements Listener {
                 Component.text("You have lost ")
                         .append(
                                 e.cube().displayName(),
-                                Component.text(" to"),
+                                Component.text(" to "),
                                 e.newClaimers().name(),
                                 Component.text("!")
                         ).style(Style.style(NamedTextColor.DARK_RED, TextDecoration.BOLD))
@@ -54,6 +56,7 @@ public class PlayerNotifier implements Listener {
             team.playSound(SOUND_CLAIMED_LOSS_DISTANT, Sound.Emitter.self());
             team.playSound(SOUND_CLAIMED_LOSS_CLOSE, x,y,z);
         });
+
         e.newClaimers().playSound(SOUND_CLAIMED_CUBE_CLOSE, x,y,z);
         e.newClaimers().playSound(SOUND_CLAIMED_CUBE_DISTANCE, Sound.Emitter.self());
 

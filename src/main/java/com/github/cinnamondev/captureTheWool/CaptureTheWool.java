@@ -2,6 +2,7 @@ package com.github.cinnamondev.captureTheWool;
 
 import com.github.cinnamondev.captureTheWool.WoolCube.CubeState;
 import com.github.cinnamondev.captureTheWool.WoolCube.WoolCube;
+import com.github.cinnamondev.captureTheWool.WoolCube.WoolCubeSnapshot;
 import com.github.cinnamondev.captureTheWool.commands.CtwCommand;
 import com.github.cinnamondev.captureTheWool.items.RespawnCompass;
 import com.github.cinnamondev.captureTheWool.util.ColourConverter;
@@ -15,9 +16,8 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.configuration.Configuration;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
-import org.bukkit.configuration.serialization.ConfigurationSerializable;
-import org.bukkit.configuration.serialization.ConfigurationSerialization;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scoreboard.*;
 
@@ -26,6 +26,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public final class CaptureTheWool extends JavaPlugin {
     public static Material UNCLAIMED_MATERIAL;
@@ -54,9 +55,47 @@ public final class CaptureTheWool extends JavaPlugin {
     }
 
     static public HashMap<UUID, WoolCube> setRespawnLocations = new HashMap<>();
+    // todo: is this actually neccesary. might be a lot of fuddy duddy messing with this.
+    //public void loadRespawnLocations() {
+    //    ConfigurationSection section = getSave().getConfigurationSection("respawns");
+    //    if (section == null) {
+    //        section = getSave().createSection("respawns");
+    //    }
+    //    setRespawnLocations = new HashMap<>(
+    //            section.getKeys(false).stream().flatMap(str -> {
+    //                UUID playerUUID = UUID.fromString(str);
+    //                var cubeUuidStr = getSave().getString("respawns." + str);
+    //                if (cubeUuidStr == null) {
+    //                    return Stream.empty();
+    //                }
+    //                UUID cubeUUID = UUID.fromString(cubeUuidStr);
+    //                WoolCube cube = cubeByUUID(cubeUUID);
+    //                if (cube == null) {
+    //                    return Stream.empty();
+    //                }
+    //                return Stream.of(Map.entry(playerUUID, cube));
+    //            }).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue))
+    //    );
+    //}
+//
+    //public void writeRespawnLocations() {
+    //    ConfigurationSection section = getSave().getConfigurationSection("respawns");
+    //    if (section == null) {
+    //        section = getSave().createSection("respawns");
+    //    }
+    //    for (var entry : setRespawnLocations.entrySet()) {
+    //        section.set(entry.getKey().toString(), entry.getValue().uuid().toString());
+    //    }
+    //}
     static public Map<Material, TeamMeta> teams = new HashMap<>();
     static public Map<String, TeamMeta> teamByName = new HashMap<>();
     static public HashSet<WoolCube> cubes = new HashSet<>();
+    public WoolCube cubeByUUID(UUID cubeUUID) {
+        for (var cube : cubes) {
+            if (cube.uuid().equals(cubeUUID)) { return cube; }
+        }
+        return null;
+    }
     public void addCube(WoolCube cube) {
         this.getServer().getPluginManager().registerEvents(cube, this);
         cubes.add(cube);
@@ -79,7 +118,7 @@ public final class CaptureTheWool extends JavaPlugin {
     public List<WoolCube> getRespawnCandidatesFor(TeamMeta team) {
         return cubes.stream().filter(cube ->
                 cube.cubeState instanceof CubeState.Claimed(TeamMeta cubeTeam, boolean canRespawn)
-                && canRespawn && team.equals(cubeTeam)
+                && !canRespawn && team.equals(cubeTeam)
         ).toList();
     }
     public Map<Material, TeamMeta> discoverTeams(boolean remakeTeams) {
@@ -98,7 +137,7 @@ public final class CaptureTheWool extends JavaPlugin {
                             .tryNamedColourFromString(cfg.getString("colour", "WHITE"))
                             .orElseThrow();
 
-                    Component teamName = mm.deserialize(cfg.getString("teamName", key)).color(colour);
+                    Component teamName = mm.deserialize(cfg.getString("display_name", key)).color(colour);
 
                     Team team = scoreboard.getTeam(key);
                     if (team != null && remakeTeams) {
@@ -119,53 +158,63 @@ public final class CaptureTheWool extends JavaPlugin {
     @Override
     public void onEnable() {
         CubeState.registerConfiguration();
+        WoolCubeSnapshot.registerConfiguration();
         saveDefaultConfig();
         reloadConfig();
 
-        this.teams = discoverTeams(false); // if teams are already made it wont remove them. because it might break scorekeeping
-        this.teamByName = this.teams.values().stream()
+        teams = discoverTeams(false); // if teams are already made it wont remove them. because it might break scorekeeping
+        teamByName = teams.values().stream()
                 .map(t -> Map.entry(t.scoreboardTeam().getName(), t))
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
-        this.UNCLAIMED_MATERIAL = Material.matchMaterial(
+        UNCLAIMED_MATERIAL = Material.matchMaterial(
                 getConfig().getString("unclaimed-material", "LIGHT_GRAY")
         );
-        if (UNCLAIMED_MATERIAL == null) { this.UNCLAIMED_MATERIAL = Material.LIGHT_GRAY_WOOL; }
-        this.UNCLAIMED_COLOUR = ColourConverter.namedColourFromString(
+        if (UNCLAIMED_MATERIAL == null) { UNCLAIMED_MATERIAL = Material.LIGHT_GRAY_WOOL; }
+        UNCLAIMED_COLOUR = ColourConverter.namedColourFromString(
                 getConfig().getString("unclaimed-colour", "GRAY"),
                 NamedTextColor.GRAY
         );
 
         loadSave();
 
-        CubeState state = getSave().getObject("state", CubeState.class);
-        getLogger().info(state.toString());
-        CubeState state2 = new CubeState.Claimed(
-                teamByName.values().stream().findFirst().orElseThrow(),
-                false
-        );
-        getSave().set("state", state2);
-        save();
+        //CubeState state = getSave().getObject("state", CubeState.class);
+        //getLogger().info(state.toString());
+        //CubeState state2 = new CubeState.Claimed(
+        //        teamByName.values().stream().findFirst().orElseThrow(),
+        //        false
+        //);
+        //getSave().set("state", state2);
+        //save();
 
-        return;
+        //return;
 
-        //getServer().getPluginManager().registerEvents(new PlayerNotifier(), this);
+        this.compass = new RespawnCompass(this);
+        getServer().getPluginManager().registerEvents(compass, this);
+        getServer().getPluginManager().registerEvents(new PlayerNotifier(), this);
 
-        //CtwCommand cmd = new CtwCommand(this);
-        //getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS, e  -> {
-        //    Commands commands = e.registrar();
-        //    commands.register(
-        //            cmd.command(),
-        //            "capture the wool",
-        //            Collections.singleton("capturethewool")
-        //    );
-        //});
+        CtwCommand cmd = new CtwCommand(this);
+        getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS, e  -> {
+            Commands commands = e.registrar();
+            commands.register(
+                    cmd.command(),
+                    "capture the wool",
+                    Collections.singleton("capturethewool")
+            );
+        });
         // Plugin startup logic
 
     }
 
+    public void loadCubes() {
+        List<WoolCubeSnapshot> snapshots = (List<WoolCubeSnapshot>) getSave().getList("cubes", Collections.emptyList());
+        snapshots.forEach(s -> { if (s != null) { addCube(s.toWoolCube(this)); }});
+    }
+
     @Override
     public void onDisable() {
+        getLogger().info("Saving the Wool Game.");
+        save();
         // Plugin shutdown logic
     }
 }

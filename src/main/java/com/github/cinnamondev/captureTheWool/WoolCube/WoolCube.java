@@ -19,12 +19,15 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Block;
+import org.bukkit.block.data.BlockData;
 import org.bukkit.configuration.serialization.ConfigurationSerializable;
+import org.bukkit.configuration.serialization.ConfigurationSerialization;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.world.ChunkUnloadEvent;
+import org.bukkit.scoreboard.Team;
 import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nullable;
@@ -35,12 +38,13 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class WoolCube implements Listener {
-
     private final CaptureTheWool p;
     public final Location root;
     public final Location respawnLocation;
     private final Component displayName;
     private BossBar bossBar;
+    protected final UUID uuid;
+    public UUID uuid() { return uuid; }
     public BossBar bossBar() { return bossBar; }
     public Component displayName() {
         NamedTextColor color = switch (cubeState) {
@@ -57,7 +61,12 @@ public class WoolCube implements Listener {
         e = switch (newState) {
             case CubeState.UnderAttack attackState when !(cubeState instanceof CubeState.UnderAttack) -> {
                 barProgress = (getMaterialCountFor(attackState.claimer().woolColour())/25f);
-                yield new CubeAttackEvent(this, cubeState, attackState, attackState.attackers().getFirst());
+                yield new CubeAttackEvent(this, false, cubeState, attackState, attackState.attackers().getLast());
+            }
+            case CubeState.UnderAttack newAttack when cubeState instanceof CubeState.UnderAttack oldAttack
+                        && !newAttack.attackers().equals(oldAttack.attackers()) -> {
+                barProgress = (getMaterialCountFor(newAttack.claimer().woolColour())/25f);
+                yield new CubeAttackEvent(this, true, cubeState, newAttack, newAttack.attackers().getLast());
             }
             case CubeState.UnderAttack attackState when cubeState instanceof CubeState.UnderAttack prevAttackState -> {
                 barProgress = (getMaterialCountFor(attackState.claimer().woolColour())/25f);
@@ -77,22 +86,21 @@ public class WoolCube implements Listener {
         return updated;
     }
     public final Set<Location> woolLocations;
-    public WoolCube(CaptureTheWool p, Location root, Component displayName, @Nullable TeamMeta currentOwner) {
-        CubeState initialState;
-        if (currentOwner == null) {
-            initialState = new CubeState.Unclaimed();
-        } else {
-            initialState = new CubeState.Claimed(currentOwner, false);
-        }
-
-        this(p,root,displayName,initialState);
+    public WoolCube(CaptureTheWool p, UUID uuid, Location root, Component displayName, @Nullable TeamMeta currentOwner) {
+        this(p,
+                uuid,
+                root,
+                displayName,
+                currentOwner == null ? new CubeState.Unclaimed() : new CubeState.Claimed(currentOwner, false));
     }
 
-    WoolCube(CaptureTheWool p, Location root, Component displayName, CubeState initialState) {
+    WoolCube(CaptureTheWool p, UUID uuid, Location root, Component displayName, CubeState initialState) {
         this.p = p;
-        this.root = root;
+        this.root = root.toBlockLocation();
         this.displayName = displayName;
         this.respawnLocation = root.add(0,4,0);
+        this.cubeState = initialState;
+        this.uuid = uuid;
         woolLocations = allWallBlocks(root);
         World world = root.getWorld();
         for (Location woolLocation : woolLocations) {
@@ -101,7 +109,7 @@ public class WoolCube implements Listener {
         }
         this.bossBar = BossBar.bossBar(this::displayName, 1.0f, BossBar.Color.PURPLE, BossBar.Overlay.PROGRESS);
     }
-    public WoolCubeSnapshot createSnapshot() { return new WoolCubeSnapshot(root, cubeState, displayName); }
+    public WoolCubeSnapshot createSnapshot() { return new WoolCubeSnapshot(uuid, root, cubeState, displayName); }
     @EventHandler
     public void playerBreakBlock(BlockBreakEvent e) {
         if (!woolLocations.contains(e.getBlock().getLocation())) {
@@ -135,8 +143,11 @@ public class WoolCube implements Listener {
                     boolean isClaimAccepted = updateCubeState(new CubeState.Claimed(team, true));
                     if (isClaimAccepted) {
                         p.getServer().getScheduler().runTaskLater(p, () -> {
-                            updateCubeState(new CubeState.Claimed(team, false));
-                        }, 200);
+                            if (cubeState instanceof CubeState.Claimed(TeamMeta claimer, boolean respawnCooldownActive)
+                             && respawnCooldownActive && claimer == team) { // if another team attacks in a short time, this might not be true.
+                                updateCubeState(new CubeState.Claimed(team, false));
+                            }
+                        }, p.getConfig().getInt("respawn-cooldown", 200));
                     }
                     yield isClaimAccepted;
                 } else if (!attackers.contains(team) && !Objects.equals(currentClaimer, team)) {
@@ -197,7 +208,7 @@ public class WoolCube implements Listener {
         return Component.text("[" + root.getBlockX() + " " + root.getBlockY() + " " + root.getBlockZ() + "]")
                 .style(style)
                 .hoverEvent(HoverEvent.showText(lore()))
-                .clickEvent(ClickEvent.suggestCommand("/ctw cube at " + root.getBlockX() + " " + root.getBlockY() + " " + root.getBlockZ() + " " + root.getWorld() + " "));
+                .clickEvent(ClickEvent.suggestCommand("/ctw cube at " + root.getBlockX() + " " + root.getBlockY() + " " + root.getBlockZ() + " " + root.getWorld().key().toString() + " "));
     }
 
     public Component lore() {
@@ -270,14 +281,19 @@ public class WoolCube implements Listener {
                 .toList()
                 .size();
     }
+
     // Reveal location by spawning an end gateway for N ticks
     public void revealLocation() {
-        Location skyBlock = root;
-        skyBlock.getBlock().setType(Material.END_GATEWAY);
+        revealLocation((Collection<Player>) p.getServer().getOnlinePlayers());
+    }
+
+    public void revealLocation(Collection<Player> players) {
+        BlockData oldBlock = root.getBlock().getBlockData();
+        players.forEach(p -> p.sendBlockChange(root, Material.END_GATEWAY.createBlockData()));
 
         p.getServer().getScheduler().runTaskLater(p, task -> {
-            skyBlock.getBlock().setType(Material.AIR);
-        }, 100);
+            players.forEach(p -> p.sendBlockChange(root, oldBlock));
+        }, p.getConfig().getInt("wool-reveal.gateway-duration", 40));
     }
 
     public static Optional<WoolCube> getNearestCube(Location current, List<WoolCube> cubes) {

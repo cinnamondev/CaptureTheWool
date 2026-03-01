@@ -1,5 +1,6 @@
 import xyz.jpenilla.resourcefactory.bukkit.Permission
 import xyz.jpenilla.resourcefactory.paper.PaperPluginYaml
+import xyz.jpenilla.resourcefactory.paper.PaperPluginYaml.Load
 
 plugins {
     java

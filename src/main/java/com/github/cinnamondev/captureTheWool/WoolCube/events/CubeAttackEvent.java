@@ -10,9 +10,15 @@ import org.jetbrains.annotations.Nullable;
 public class CubeAttackEvent extends StateChangeEvent implements Cancellable {
     private TeamMeta attackingTeam;
     public TeamMeta attackingTeam() { return attackingTeam; }
-    public CubeAttackEvent(WoolCube cube, @Nullable CubeState previous, CubeState.UnderAttack newState, TeamMeta attackingTeam) {
+    private boolean additionalTeam;
+    public boolean isAdditionalTeamAttacking() { return additionalTeam; } // initial attack (t1 vs t2) : false
+    // further attacks where t1 vs t2, this event will not fire
+    // BUT. if it becomes t1 vs { t2, t3, ...} this event will fire with this flag true for each initial attack of another team.
+    // this is helpful for Reveals.
+    public CubeAttackEvent(WoolCube cube, boolean additionalTeam, @Nullable CubeState previous, CubeState.UnderAttack newState, TeamMeta attackingTeam) {
         super(cube, previous, newState);
         this.attackingTeam = attackingTeam;
+        this.additionalTeam = additionalTeam;
         attackingTeam.scoreboardTeam();
     }
 

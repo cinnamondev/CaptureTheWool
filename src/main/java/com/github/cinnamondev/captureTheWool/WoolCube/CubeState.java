@@ -23,6 +23,7 @@ public sealed interface CubeState extends ConfigurationSerializable {
 
     }
 
+    @SerializableAs("Claimed")
     record Claimed(TeamMeta claimer, boolean respawnCooldownActive) implements CubeState {
         @Override
         public @NotNull Map<String, Object> serialize() {
@@ -46,6 +47,7 @@ public sealed interface CubeState extends ConfigurationSerializable {
         }
     }
     // one or more teams may be attacking!
+    @SerializableAs("UnderAttack")
     record UnderAttack(@Nullable TeamMeta claimer, ArrayList<TeamMeta> attackers) implements CubeState {
         @Override
         public @NotNull Map<String, Object> serialize() {
@@ -71,6 +73,7 @@ public sealed interface CubeState extends ConfigurationSerializable {
             return new UnderAttack(claimingTeam, attackingTeams);
         }
     }
+    @SerializableAs("Unclaimed")
     record Unclaimed() implements CubeState {
         @Override
         public @NotNull Map<String, Object> serialize() {
