@@ -1,8 +1,9 @@
-package com.github.cinnamondev.captureTheWool.WoolCube.events;
+package com.github.cinnamondev.captureTheWool.woolCube.events;
 
 import com.github.cinnamondev.captureTheWool.TeamMeta;
-import com.github.cinnamondev.captureTheWool.WoolCube.CubeState;
-import com.github.cinnamondev.captureTheWool.WoolCube.WoolCube;
+import com.github.cinnamondev.captureTheWool.woolCube.CubeState;
+import com.github.cinnamondev.captureTheWool.woolCube.WoolCube;
+import org.bukkit.entity.Player;
 import org.bukkit.event.Cancellable;
 import org.bukkit.event.HandlerList;
 import org.jetbrains.annotations.Nullable;
@@ -11,8 +12,8 @@ import java.util.ArrayList;
 import java.util.Optional;
 
 public class CubeClaimedEvent extends StateChangeEvent implements Cancellable {
-    public CubeClaimedEvent(WoolCube cube, @Nullable CubeState previous, CubeState.Claimed newState) {
-        super(cube, previous, newState);
+    public CubeClaimedEvent(WoolCube cube, @Nullable CubeState previous, CubeState.Claimed newState, @Nullable Player cause) {
+        super(cube, previous, newState, cause);
     }
 
     @Override

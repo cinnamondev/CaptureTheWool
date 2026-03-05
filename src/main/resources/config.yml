@@ -1,5 +1,3 @@
-
-
 teams:
   GREEN_WOOL:
     display_name: "Greens" # team name
@@ -17,16 +15,23 @@ teams:
 unclaimed-colour: GRAY
 unclaimed-material: LIGHT_GRAY
 
-contested-claims:
-  # set to -1 to disable timeout contesting
-  timeout: 6000 # in ticks (20 / s)
-  # in the case multiple teams attack another teams wool, the defending team's colour is entirely replaced on the cube, but
-  # there is a contest on who claims the wool, enabling this behaviour will set the wool to unclaimed after the timeout
-  # set to false to have it change wool state to an under attack state (except that the dominant team is the new
-  # 'current claimer' and everyone else is an attacker.
-  #
-  # default: true
-  revert-multi-claims-to-unclaimed: true
+notify-on-total-loss: ALL # ALL, ATTACKERS, DEFENDERS, PARTIES
+
+last-chance:
+  enabled: true
+
+allow-last-chance-respawns: true
+
+## contested-claims:
+##   # set to -1 to disable timeout contesting
+##   timeout: 6000 # in ticks (20 / s)
+##   # in the case multiple teams attack another teams wool, the defending team's colour is entirely replaced on the cube, but
+##   # there is a contest on who claims the wool, enabling this behaviour will set the wool to unclaimed after the timeout
+##   # set to false to have it change wool state to an under attack state (except that the dominant team is the new
+##   # 'current claimer' and everyone else is an attacker.
+##   #
+##   # default: true
+##   revert-multi-claims-to-unclaimed: true
 
 # spawns an end gateway
 wool-reveal:
@@ -39,7 +44,28 @@ wool-reveal:
       to: ALL
     CUBE_DEFEND: # UnderAttack(team1, [team2,...]) -> Claimed(team1,_)
       to: PARTIES
-  gateway-duration: 40 # ticks
+  gateway-duration: 200 # ticks
   gateway-interval: 2000
+
+spyglass:
+  block: SPYGLASS
+  recipe: [ EMPTY,      EMPTY,      DIAMOND,
+            EMPTY,      GOLD_INGOT, EMPTY,
+            GOLD_INGOT, EMPTY,      EMPTY ]
+  verbose-to-defenders: false # if defenders are told, will they be told which one? or will it just show ANY cube.
+  glow:
+    on: false # attackers will start glowing once a reveal has happened.
+    after: 200 # attackers start glowing after...
+    for: 200 # for this time.
+  reveal:
+    to: PARTIES # DEFENDERS, PARTIES, NONE
+    period: 600
+    additional-times: 1
+
+compass:
+  block: COMPASS
+  recipe: [ EMPTY,      IRON_INGOT,   EMPTY,
+            IRON_INGOT, STICK,        IRON_INGOT,
+            EMPTY,      IRON_INGOT,   EMPTY ]
 
 scrambler:

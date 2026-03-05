@@ -1,11 +1,13 @@
-package com.github.cinnamondev.captureTheWool.WoolCube.events;
+package com.github.cinnamondev.captureTheWool.woolCube.events;
 
 import com.github.cinnamondev.captureTheWool.TeamMeta;
-import com.github.cinnamondev.captureTheWool.WoolCube.CubeState;
-import com.github.cinnamondev.captureTheWool.WoolCube.WoolCube;
+import com.github.cinnamondev.captureTheWool.woolCube.CubeState;
+import com.github.cinnamondev.captureTheWool.woolCube.WoolCube;
+import org.bukkit.entity.Player;
 import org.bukkit.event.Cancellable;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -25,31 +27,31 @@ public class StateChangeEvent extends Event implements Cancellable {
         Undetermined
     }
 
-    private WoolCube cube;
+    private final WoolCube cube;
 
     public WoolCube cube() { return this.cube; }
-    private @Nullable CubeState previous;
+    private final @Nullable CubeState previous;
+    private final @Nullable Player causingPlayer;
+    public Player player() { return causingPlayer; }
     public CubeState previousState() { return this.previous; }
-    private CubeState current;
-    public CubeState newState() { return this.current; }
-    public StateChangeEvent(WoolCube cube, @Nullable CubeState previousState, CubeState currentState) {
+    private final CubeState current;
+    public @NotNull CubeState newState() { return this.current; }
+    public StateChangeEvent(WoolCube cube, @Nullable CubeState previousState, CubeState currentState, @Nullable Player causingPlayer) {
         this.cube = cube;
         this.previous = previousState;
         this.current = currentState;
+        this.causingPlayer = causingPlayer;
     }
 
     public List<TeamMeta> relevantTeams() {
         ArrayList<TeamMeta> teams = new ArrayList<>();
 
         switch (previous) {
-            case CubeState.Claimed(TeamMeta claimer, boolean respawn)-> {
-                teams.add(claimer);
-            }
+            case CubeState.Claimed(TeamMeta claimer, boolean respawn)-> teams.add(claimer);
             case CubeState.UnderAttack(TeamMeta claimer, ArrayList<TeamMeta> attackers) -> {
                 teams.add(claimer);
                 teams.addAll(attackers.stream().filter(teams::contains).toList());
             }
-            case CubeState.Unclaimed unclaimed-> {}
             case null, default -> {}
         }
         switch (current) {
@@ -60,7 +62,6 @@ public class StateChangeEvent extends Event implements Cancellable {
                 if (!teams.contains(claimer)) { teams.add(claimer); }
                 teams.addAll(attackers.stream().filter(teams::contains).toList());
             }
-            case CubeState.Unclaimed unclaimed -> {}
             case null, default -> {}
         }
         return teams;

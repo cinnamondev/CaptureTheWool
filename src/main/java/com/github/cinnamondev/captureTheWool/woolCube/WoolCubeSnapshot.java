@@ -1,8 +1,7 @@
-package com.github.cinnamondev.captureTheWool.WoolCube;
+package com.github.cinnamondev.captureTheWool.woolCube;
 
 import com.github.cinnamondev.captureTheWool.CaptureTheWool;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.serializer.ComponentSerializer;
 import net.kyori.adventure.text.serializer.json.JSONComponentSerializer;
 import org.bukkit.Location;
 import org.bukkit.configuration.serialization.ConfigurationSerializable;
@@ -18,7 +17,7 @@ public record WoolCubeSnapshot(UUID cubeUUID, Location root, CubeState state, Co
     public static void registerConfiguration() {
         ConfigurationSerialization.registerClass(WoolCubeSnapshot.class);
     }
-    private static JSONComponentSerializer serializer = JSONComponentSerializer.json();
+    private static final JSONComponentSerializer serializer = JSONComponentSerializer.json();
     public WoolCube toWoolCube(CaptureTheWool p) {
         return new WoolCube(p, cubeUUID, root, displayName, state);
     }

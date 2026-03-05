@@ -1,25 +1,22 @@
-package com.github.cinnamondev.captureTheWool.WoolCube.events;
+package com.github.cinnamondev.captureTheWool.woolCube.events;
 
 import com.github.cinnamondev.captureTheWool.TeamMeta;
-import com.github.cinnamondev.captureTheWool.WoolCube.CubeState;
-import com.github.cinnamondev.captureTheWool.WoolCube.WoolCube;
+import com.github.cinnamondev.captureTheWool.woolCube.CubeState;
+import com.github.cinnamondev.captureTheWool.woolCube.WoolCube;
+import org.bukkit.entity.Player;
 import org.bukkit.event.Cancellable;
 import org.bukkit.event.HandlerList;
 import org.jetbrains.annotations.Nullable;
 
-public class CubeAttackEvent extends StateChangeEvent implements Cancellable {
-    private TeamMeta attackingTeam;
-    public TeamMeta attackingTeam() { return attackingTeam; }
-    private boolean additionalTeam;
+public class CubeAttackEvent extends CubeDamageEvent implements Cancellable {
+    private final boolean additionalTeam;
     public boolean isAdditionalTeamAttacking() { return additionalTeam; } // initial attack (t1 vs t2) : false
     // further attacks where t1 vs t2, this event will not fire
     // BUT. if it becomes t1 vs { t2, t3, ...} this event will fire with this flag true for each initial attack of another team.
     // this is helpful for Reveals.
-    public CubeAttackEvent(WoolCube cube, boolean additionalTeam, @Nullable CubeState previous, CubeState.UnderAttack newState, TeamMeta attackingTeam) {
-        super(cube, previous, newState);
-        this.attackingTeam = attackingTeam;
+    public CubeAttackEvent(WoolCube cube, boolean additionalTeam, @Nullable CubeState previous, CubeState.UnderAttack newState, TeamMeta attackingTeam, @Nullable Player cause) {
+        super(cube, previous, newState, attackingTeam, cause);
         this.additionalTeam = additionalTeam;
-        attackingTeam.scoreboardTeam();
     }
 
     @Override

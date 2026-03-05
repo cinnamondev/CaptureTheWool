@@ -1,8 +1,9 @@
-package com.github.cinnamondev.captureTheWool.WoolCube.events;
+package com.github.cinnamondev.captureTheWool.woolCube.events;
 
 import com.github.cinnamondev.captureTheWool.TeamMeta;
-import com.github.cinnamondev.captureTheWool.WoolCube.CubeState;
-import com.github.cinnamondev.captureTheWool.WoolCube.WoolCube;
+import com.github.cinnamondev.captureTheWool.woolCube.CubeState;
+import com.github.cinnamondev.captureTheWool.woolCube.WoolCube;
+import org.bukkit.entity.Player;
 import org.bukkit.event.Cancellable;
 import org.bukkit.event.HandlerList;
 import org.jetbrains.annotations.Nullable;
@@ -12,12 +13,11 @@ public class CubeDamageEvent extends StateChangeEvent implements Cancellable {
     public TeamMeta attackingTeam() {
         return attackingTeam;
     }
+    public TeamMeta defendingTeam() { return newState().claimer(); }
 
-    public CubeDamageEvent(WoolCube cube, @Nullable CubeState.UnderAttack previous, CubeState.UnderAttack newState, TeamMeta attackingTeam) {
-        super(cube,previous,newState);
+    public CubeDamageEvent(WoolCube cube, @Nullable CubeState previous, CubeState.UnderAttack newState, TeamMeta attackingTeam, @Nullable Player cause) {
+        super(cube,previous,newState, cause);
         this.attackingTeam = attackingTeam;
-        attackingTeam.scoreboardTeam();
-
         // INTENDED MECHANIC: fog of war?
         // so, we want the defending players to know how much theyre losing. i suppose this should be neutralized if a 'scrambler' is in effect, though
         // perhaps it should still launch a gateway. I dont know!

@@ -1,4 +1,4 @@
-package com.github.cinnamondev.captureTheWool.WoolCube;
+package com.github.cinnamondev.captureTheWool.woolCube;
 
 import com.github.cinnamondev.captureTheWool.CaptureTheWool;
 import com.github.cinnamondev.captureTheWool.TeamMeta;
@@ -36,8 +36,11 @@ public sealed interface CubeState extends ConfigurationSerializable {
         public static Claimed deserialize(Map<String,Object> args) {
             TeamMeta claimingTeam; {
                 String claimerString = (String) args.get("claimerName");
-                if (claimerString.equals("null")) { claimingTeam = null; }
-                claimingTeam = CaptureTheWool.teamByName.get(claimerString); // MIGHT still be null now. precautionary you need to still check even when you know.
+                if (claimerString.equals("null")) {
+                    claimingTeam = null;
+                } else {
+                    claimingTeam = CaptureTheWool.teamByName.get(claimerString); // MIGHT still be null now. precautionary you need to still check even when you know.
+                }
             }
             if (claimingTeam == null) { throw new IllegalArgumentException("cannot have null claimer."); }
             Boolean cooldown = (Boolean) args.get("cooldownActive");

@@ -17,25 +17,20 @@ import org.bukkit.Material;
 import java.util.concurrent.CompletableFuture;
 
 public final class TeamArgument implements CustomArgumentType.Converted<TeamMeta, String> {
-    private final CaptureTheWool p;
-    public TeamArgument(CaptureTheWool p) {
-        this.p = p;
-    }
-
     private static final DynamicCommandExceptionType ERROR_INVALID_TEAM_NAME = new DynamicCommandExceptionType(t -> {
         return MessageComponentSerializer.message().serialize(Component.text(t + " is not a valid team."));
     });
 
     @Override
     public TeamMeta convert(String nativeType) throws CommandSyntaxException {
-        TeamMeta meta = p.teams.get(Material.matchMaterial(nativeType));
+        TeamMeta meta = CaptureTheWool.teams.get(Material.matchMaterial(nativeType));
         if (meta == null) { throw ERROR_INVALID_TEAM_NAME.create(nativeType); }
         return meta;
     }
 
     @Override
     public <S> CompletableFuture<Suggestions> listSuggestions(CommandContext<S> context, SuggestionsBuilder builder) {
-        for (Material key: p.teams.keySet()) {
+        for (Material key: CaptureTheWool.teams.keySet()) {
             String keyString = key.toString();
             if (keyString.startsWith(builder.getRemaining())) {
                 builder.suggest(keyString);

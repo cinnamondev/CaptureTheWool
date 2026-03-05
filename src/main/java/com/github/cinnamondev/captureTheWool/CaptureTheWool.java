@@ -1,17 +1,21 @@
 package com.github.cinnamondev.captureTheWool;
 
-import com.github.cinnamondev.captureTheWool.WoolCube.CubeState;
-import com.github.cinnamondev.captureTheWool.WoolCube.WoolCube;
-import com.github.cinnamondev.captureTheWool.WoolCube.WoolCubeSnapshot;
+import com.github.cinnamondev.captureTheWool.woolCube.CubeState;
+import com.github.cinnamondev.captureTheWool.woolCube.WoolCube;
+import com.github.cinnamondev.captureTheWool.woolCube.WoolCubeSnapshot;
 import com.github.cinnamondev.captureTheWool.commands.CtwCommand;
 import com.github.cinnamondev.captureTheWool.items.RespawnCompass;
+import com.github.cinnamondev.captureTheWool.items.Spyglass;
 import com.github.cinnamondev.captureTheWool.util.ColourConverter;
 import io.papermc.paper.command.brigadier.Commands;
 import io.papermc.paper.math.BlockPosition;
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
+import net.kyori.adventure.audience.Audience;
+import net.kyori.adventure.bossbar.BossBar;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.minimessage.MiniMessage;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.OfflinePlayer;
@@ -32,6 +36,7 @@ public final class CaptureTheWool extends JavaPlugin {
     public static Material UNCLAIMED_MATERIAL;
     public static NamedTextColor UNCLAIMED_COLOUR;
     public RespawnCompass compass;
+    public Spyglass spyglass;
 
     private final File file = new File(this.getDataFolder(), "save.yml");
     //public Map<UUID, Material> assignedTeams = new HashMap<>();
@@ -41,52 +46,9 @@ public final class CaptureTheWool extends JavaPlugin {
         return teamByName.get(team.getName());
     }
 
-    private YamlConfiguration save;
-    public void loadSave() {
-        this.save = YamlConfiguration.loadConfiguration(file);
-    }
-    public Configuration getSave() { return save; }
-    public void save() {
-        try {
-            save.save(file);
-        } catch (IOException e) {
-            getLogger().severe(e.getMessage());
-        }
-    }
 
     static public HashMap<UUID, WoolCube> setRespawnLocations = new HashMap<>();
-    // todo: is this actually neccesary. might be a lot of fuddy duddy messing with this.
-    //public void loadRespawnLocations() {
-    //    ConfigurationSection section = getSave().getConfigurationSection("respawns");
-    //    if (section == null) {
-    //        section = getSave().createSection("respawns");
-    //    }
-    //    setRespawnLocations = new HashMap<>(
-    //            section.getKeys(false).stream().flatMap(str -> {
-    //                UUID playerUUID = UUID.fromString(str);
-    //                var cubeUuidStr = getSave().getString("respawns." + str);
-    //                if (cubeUuidStr == null) {
-    //                    return Stream.empty();
-    //                }
-    //                UUID cubeUUID = UUID.fromString(cubeUuidStr);
-    //                WoolCube cube = cubeByUUID(cubeUUID);
-    //                if (cube == null) {
-    //                    return Stream.empty();
-    //                }
-    //                return Stream.of(Map.entry(playerUUID, cube));
-    //            }).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue))
-    //    );
-    //}
-//
-    //public void writeRespawnLocations() {
-    //    ConfigurationSection section = getSave().getConfigurationSection("respawns");
-    //    if (section == null) {
-    //        section = getSave().createSection("respawns");
-    //    }
-    //    for (var entry : setRespawnLocations.entrySet()) {
-    //        section.set(entry.getKey().toString(), entry.getValue().uuid().toString());
-    //    }
-    //}
+
     static public Map<Material, TeamMeta> teams = new HashMap<>();
     static public Map<String, TeamMeta> teamByName = new HashMap<>();
     static public HashSet<WoolCube> cubes = new HashSet<>();
@@ -117,8 +79,8 @@ public final class CaptureTheWool extends JavaPlugin {
     }
     public List<WoolCube> getRespawnCandidatesFor(TeamMeta team) {
         return cubes.stream().filter(cube ->
-                cube.cubeState instanceof CubeState.Claimed(TeamMeta cubeTeam, boolean canRespawn)
-                && !canRespawn && team.equals(cubeTeam)
+                cube.cubeState instanceof CubeState.Claimed(TeamMeta cubeTeam, boolean cooldownActive)
+                && !cooldownActive && team.equals(cubeTeam)
         ).toList();
     }
     public Map<Material, TeamMeta> discoverTeams(boolean remakeTeams) {
@@ -141,10 +103,12 @@ public final class CaptureTheWool extends JavaPlugin {
 
                     Team team = scoreboard.getTeam(key);
                     if (team != null && remakeTeams) {
+                        getLogger().info("Team " + e.getKey() + " existed, recreating.");
                         team.unregister();
                         team = null;
                     }
                     if (team == null) {
+                        getLogger().info("Team " + e.getKey() + " didn't exist, creating.");
                         team = scoreboard.registerNewTeam(key);
                         team.displayName(teamName);
                         team.color(colour);
@@ -155,17 +119,37 @@ public final class CaptureTheWool extends JavaPlugin {
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     }
 
+    public void teamsFromConfig(boolean remakeTeams) {
+        teams = discoverTeams(remakeTeams);
+        teamByName = teams.values().stream()
+                .map(t -> Map.entry(t.scoreboardTeam().getName(), t))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    }
+
+    private @Nullable BossBar activeBar;
+
+    public void showMyBossBar(final Audience target) {
+        final Component name = Component.text("Awesome BossBar");
+        // Creates a red boss bar which has no progress and no notches
+        final BossBar emptyBar = BossBar.bossBar(name, 0.3f, BossBar.Color.RED, BossBar.Overlay.PROGRESS);
+        // Creates a green boss bar which has 50% progress and 10 notches
+        final BossBar halfBar = BossBar.bossBar(name, 0.5f, BossBar.Color.GREEN, BossBar.Overlay.NOTCHED_10);
+        // etc..
+        final BossBar fullBar = BossBar.bossBar(name, 1, BossBar.Color.BLUE, BossBar.Overlay.NOTCHED_20);
+
+        // Send a bossbar to your audience
+        target.showBossBar(emptyBar);
+
+        // Store it locally to be able to hide it manually later
+        this.activeBar = fullBar;
+    }
     @Override
     public void onEnable() {
         CubeState.registerConfiguration();
         WoolCubeSnapshot.registerConfiguration();
         saveDefaultConfig();
         reloadConfig();
-
-        teams = discoverTeams(false); // if teams are already made it wont remove them. because it might break scorekeeping
-        teamByName = teams.values().stream()
-                .map(t -> Map.entry(t.scoreboardTeam().getName(), t))
-                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+        teamsFromConfig(false);
 
         UNCLAIMED_MATERIAL = Material.matchMaterial(
                 getConfig().getString("unclaimed-material", "LIGHT_GRAY")
@@ -178,20 +162,12 @@ public final class CaptureTheWool extends JavaPlugin {
 
         loadSave();
 
-        //CubeState state = getSave().getObject("state", CubeState.class);
-        //getLogger().info(state.toString());
-        //CubeState state2 = new CubeState.Claimed(
-        //        teamByName.values().stream().findFirst().orElseThrow(),
-        //        false
-        //);
-        //getSave().set("state", state2);
-        //save();
-
-        //return;
-
         this.compass = new RespawnCompass(this);
+        this.spyglass = new Spyglass(this);
         getServer().getPluginManager().registerEvents(compass, this);
-        getServer().getPluginManager().registerEvents(new PlayerNotifier(), this);
+        getServer().getPluginManager().registerEvents(spyglass, this);
+        getServer().getPluginManager().registerEvents(new PlayerNotifier(this), this);
+        getServer().getPluginManager().registerEvents(new RevealManager(this), this);
 
         CtwCommand cmd = new CtwCommand(this);
         getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS, e  -> {
@@ -202,15 +178,66 @@ public final class CaptureTheWool extends JavaPlugin {
                     Collections.singleton("capturethewool")
             );
         });
+
+        Bukkit.addRecipe(compass.recipe(), true);
+        //getServer().addRecipe(compass.recipe(), true);
+        getServer().addRecipe(spyglass.recipe(), true);
+        loadCubes();
         // Plugin startup logic
 
     }
 
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// Saves
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    private YamlConfiguration save;
+    public void loadSave() {
+        this.save = YamlConfiguration.loadConfiguration(file);
+    }
+    public Configuration getSave() { return save; }
+    public void save() {
+        try {
+            save.save(file);
+        } catch (IOException e) {
+            getLogger().severe(e.getMessage());
+        }
+    }
     public void loadCubes() {
         List<WoolCubeSnapshot> snapshots = (List<WoolCubeSnapshot>) getSave().getList("cubes", Collections.emptyList());
         snapshots.forEach(s -> { if (s != null) { addCube(s.toWoolCube(this)); }});
     }
+    public void loadRespawnLocations() {
+        ConfigurationSection section = getSave().getConfigurationSection("respawns");
+        if (section == null) {
+            section = getSave().createSection("respawns");
+        }
+        setRespawnLocations = new HashMap<>(
+                section.getKeys(false).stream().flatMap(str -> {
+                    UUID playerUUID = UUID.fromString(str);
+                    var cubeUuidStr = getSave().getString("respawns." + str);
+                    if (cubeUuidStr == null) {
+                        return Stream.empty();
+                    }
+                    UUID cubeUUID = UUID.fromString(cubeUuidStr);
+                    WoolCube cube = cubeByUUID(cubeUUID);
+                    if (cube == null) {
+                        return Stream.empty();
+                    }
+                    return Stream.of(Map.entry(playerUUID, cube));
+                }).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue))
+        );
+    }
 
+    public void writeRespawnLocations() {
+        ConfigurationSection section = getSave().getConfigurationSection("respawns");
+        if (section == null) {
+            section = getSave().createSection("respawns");
+        }
+        for (var entry : setRespawnLocations.entrySet()) {
+            section.set(entry.getKey().toString(), entry.getValue().uuid().toString());
+        }
+    }
     @Override
     public void onDisable() {
         getLogger().info("Saving the Wool Game.");

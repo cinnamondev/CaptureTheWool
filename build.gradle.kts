@@ -61,6 +61,7 @@ paperPluginYaml {
     //bootstrapper = "com.github.cinnamondev.railworks.RailworksBootstrap"
     apiVersion = "1.21"
     authors.add("cinnamondev")
+    description = "Capture The Wool by Cinnamondev"
     dependencies {
 
     }
