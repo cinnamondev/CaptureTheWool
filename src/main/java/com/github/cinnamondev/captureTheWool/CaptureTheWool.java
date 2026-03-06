@@ -100,8 +100,9 @@ public final class CaptureTheWool extends JavaPlugin {
                             .orElseThrow();
 
                     Component teamName = mm.deserialize(cfg.getString("display_name", key)).color(colour);
+                    String internalTeamName = cfg.getString("team_name", key);
 
-                    Team team = scoreboard.getTeam(key);
+                    Team team = scoreboard.getTeam(internalTeamName);
                     if (team != null && remakeTeams) {
                         getLogger().info("Team " + e.getKey() + " existed, recreating.");
                         team.unregister();
@@ -109,7 +110,7 @@ public final class CaptureTheWool extends JavaPlugin {
                     }
                     if (team == null) {
                         getLogger().info("Team " + e.getKey() + " didn't exist, creating.");
-                        team = scoreboard.registerNewTeam(key);
+                        team = scoreboard.registerNewTeam(internalTeamName);
                         team.displayName(teamName);
                         team.color(colour);
                         team.setAllowFriendlyFire(false);

@@ -44,6 +44,8 @@ wool-reveal:
       to: ALL
     CUBE_DEFEND: # UnderAttack(team1, [team2,...]) -> Claimed(team1,_)
       to: PARTIES
+    RESPAWN_UNLOCK:
+      to: DEFENDERS
   gateway-duration: 200 # ticks
   gateway-interval: 2000
 

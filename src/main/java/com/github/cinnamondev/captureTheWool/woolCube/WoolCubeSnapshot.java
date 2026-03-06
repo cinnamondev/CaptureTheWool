@@ -12,10 +12,10 @@ import org.jetbrains.annotations.NotNull;
 import java.util.Map;
 import java.util.UUID;
 
-@SerializableAs("CubeSnapshot")
+@SerializableAs("WoolCube")
 public record WoolCubeSnapshot(UUID cubeUUID, Location root, CubeState state, Component displayName) implements ConfigurationSerializable {
     public static void registerConfiguration() {
-        ConfigurationSerialization.registerClass(WoolCubeSnapshot.class);
+        ConfigurationSerialization.registerClass(WoolCubeSnapshot.class, "WoolCube");
     }
     private static final JSONComponentSerializer serializer = JSONComponentSerializer.json();
     public WoolCube toWoolCube(CaptureTheWool p) {
