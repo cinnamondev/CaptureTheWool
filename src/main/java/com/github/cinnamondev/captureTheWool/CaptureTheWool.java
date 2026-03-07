@@ -95,8 +95,9 @@ public final class CaptureTheWool extends JavaPlugin {
                     var cfg = e.getValue();
                     Material woolBlock = Material.matchMaterial(e.getKey());
                     if (woolBlock == null) { throw new IllegalArgumentException("Invalid woolBlock for team " + key); }
+                    getLogger().info("LDSHF" + cfg.getString("colour", "WHITE").toUpperCase().trim());
                     NamedTextColor colour = ColourConverter
-                            .tryNamedColourFromString(cfg.getString("colour", "WHITE"))
+                            .tryNamedColourFromString(cfg.getString("colour", "WHITE").toUpperCase().trim())
                             .orElseThrow();
 
                     Component teamName = mm.deserialize(cfg.getString("display_name", key)).color(colour);

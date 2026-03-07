@@ -24,7 +24,7 @@ repositories {
 }
 
 dependencies {
-    compileOnly("io.papermc.paper:paper-api:1.21.10-R0.1-SNAPSHOT")
+    compileOnly("io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT")
 }
 
 group = "com.github.cinnamondev"
@@ -51,7 +51,7 @@ tasks {
             modrinth("luckperms", "v5.5.17-bukkit")
         }
         runDirectory.set(layout.buildDirectory.dir("run"))
-        minecraftVersion("1.21.10")
+        minecraftVersion("1.21.11")
     }
 }
 

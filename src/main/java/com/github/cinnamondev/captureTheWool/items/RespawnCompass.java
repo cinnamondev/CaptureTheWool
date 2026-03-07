@@ -1,6 +1,7 @@
 package com.github.cinnamondev.captureTheWool.items;
 
 import com.destroystokyo.paper.event.player.PlayerStartSpectatingEntityEvent;
+import com.destroystokyo.paper.event.player.PlayerStopSpectatingEntityEvent;
 import com.github.cinnamondev.captureTheWool.CaptureTheWool;
 import com.github.cinnamondev.captureTheWool.TeamMeta;
 import com.github.cinnamondev.captureTheWool.woolCube.CubeState;
@@ -269,10 +270,18 @@ public class RespawnCompass implements Listener, RecipeProvider<Recipe> {
                 e.getPlayer().setGameMode(GameMode.SPECTATOR);
 
                 e.getPlayer().sendActionBar(Component.text("Is it really that time again?"));
+                ArrayList<WoolCube> newCandidates = new ArrayList<>(respawnCandidates);
                 p.getServer().getScheduler().runTaskLater(p, () -> {
-                    e.getPlayer().setGameMode(GameMode.SURVIVAL);
+                    newCandidates.removeIf(woolCube ->
+                                    !((woolCube.cubeState instanceof CubeState.Claimed(TeamMeta claimer, boolean cd) && claimer.equals(playerTeam))
+                                    && (woolCube.cubeState instanceof CubeState.UnderAttack(TeamMeta claimer1, ArrayList<TeamMeta> att) && claimer1.equals(playerTeam))));
+                    if (!newCandidates.isEmpty()) {
+                        e.getPlayer().setGameMode(GameMode.SURVIVAL);
+                        e.getPlayer().sendMessage(Component.text("But it refused.").color(NamedTextColor.RED).decorate(TextDecoration.BOLD));
+                    } else {
+                        new PlayerFinalDeathEvent(e).callEvent();
+                    }
                     playersInRespawnCoolDown.remove(e.getPlayer().getUniqueId());
-                    e.getPlayer().sendMessage(Component.text("But it refused.").color(NamedTextColor.RED).decorate(TextDecoration.BOLD));
                 }, 10 * 20);
             }
         }
@@ -280,9 +289,9 @@ public class RespawnCompass implements Listener, RecipeProvider<Recipe> {
         List<Integer> slots = RespawnCompass.extractCompassSlot(e.getPlayer().getInventory());
         if (respawnCandidates.isEmpty()) {
             // Player is DEAD.
+            e.getPlayer().setGameMode(GameMode.SPECTATOR);
             new PlayerFinalDeathEvent(e).callEvent();
             respawnMap.put(e.getPlayer().getUniqueId(), Pair.of(slots,e.getPlayer().getLocation()));
-            e.getPlayer().setGameMode(GameMode.SPECTATOR);
             return;
         }
 
@@ -309,6 +318,46 @@ public class RespawnCompass implements Listener, RecipeProvider<Recipe> {
     @EventHandler
     public void preventSpectatingProperlyDuringCooldown(PlayerStartSpectatingEntityEvent e) {
         if (playersInRespawnCoolDown.contains(e.getPlayer().getUniqueId())) { e.setCancelled(true); }
+    }
+
+    @EventHandler
+    public void playerFinalDeathEvent(PlayerFinalDeathEvent e) {
+        p.getServer().getScheduler().runTaskLater(p, () -> {
+            TeamMeta team = p.getPlayerTeam(e.event().getPlayer());
+            if (team == null) { return; }
+            team.getOnlinePlayers(p).findAny().ifPresent(p -> e.event().getPlayer().setSpectatorTarget(p));
+        },1);
+    }
+
+    @EventHandler
+    public void preventNonTeamSpectate(PlayerStartSpectatingEntityEvent e) {
+        if (e.getPlayer().hasPermission("ctw.bypass-spectator")) { return; }
+        if (!(e.getNewSpectatorTarget() instanceof Player player)) {
+            e.setCancelled(true);
+            return;
+        }
+
+        TeamMeta playerTeam = p.getPlayerTeam(e.getPlayer());
+        TeamMeta targetTeam = p.getPlayerTeam(player);
+        if (playerTeam == null || !playerTeam.equals(targetTeam)) {
+            e.setCancelled(true);
+        }
+    }
+    @EventHandler
+    public void preventNotSpectatingEntityIfDead(PlayerStopSpectatingEntityEvent e) {
+        if (!e.getPlayer().hasPermission("ctw.bypass-spectator")) { e.setCancelled( true); }
+    }
+
+    @EventHandler
+    public void spectatorRespawn(PlayerRespawnEvent e) {
+        if (!e.getPlayer().hasPermission("ctw.bypass-spectator")
+                && e.getPlayer().getGameMode() == GameMode.SPECTATOR) { return; }
+
+        TeamMeta team = p.getPlayerTeam(e.getPlayer());
+        if (team == null) {
+            return;
+        }
+        team.getOnlinePlayers(p).findAny().ifPresent(p -> e.getPlayer().setSpectatorTarget(p));
     }
     @EventHandler
     public void setRespawnLocation(PlayerRespawnEvent e) {

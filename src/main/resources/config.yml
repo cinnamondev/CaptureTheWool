@@ -1,16 +1,16 @@
 teams:
   GREEN_WOOL:
     display_name: "Greens" # team name
-    colour: GREEN # team display colour
+    colour: "GREEN" # team display colour
   YELLOW_WOOL:
     display_name: "Yellows"
-    colour: YELLOW
+    colour: "YELLOW"
   RED_WOOL:
     display_name: "Reds"
-    colour: RED
+    colour: "RED"
   BLUE_WOOL:
     display_name: "Blues"
-    colour: BLUE
+    colour: "BLUE"
 
 unclaimed-colour: GRAY
 unclaimed-material: LIGHT_GRAY
@@ -36,7 +36,7 @@ allow-last-chance-respawns: true
 # spawns an end gateway
 wool-reveal:
   enabled: true
-  on:
+  when:
     CUBE_ATTACK: # Claimed(team1,_) -> UnderAttack(team1, [team2,...])
       to: ALL # ALL, ATTACKERS, DEFENDERS, PARTIES (attackers + defenders)
       repeat-for-new-teams: true # fire again when another team comes in.
@@ -61,8 +61,8 @@ spyglass:
     for: 200 # for this time.
   reveal:
     to: PARTIES # DEFENDERS, PARTIES, NONE
-    period: 600
-    additional-times: 1
+    period: 400
+    additional-times: 2
 
 compass:
   block: COMPASS

@@ -1,11 +1,13 @@
 package com.github.cinnamondev.captureTheWool.woolCube;
 
+import com.destroystokyo.paper.event.block.BlockDestroyEvent;
 import com.github.cinnamondev.captureTheWool.CaptureTheWool;
 import com.github.cinnamondev.captureTheWool.TeamMeta;
 import com.github.cinnamondev.captureTheWool.woolCube.events.CubeAttackEvent;
 import com.github.cinnamondev.captureTheWool.woolCube.events.CubeClaimedEvent;
 import com.github.cinnamondev.captureTheWool.woolCube.events.CubeDamageEvent;
 import com.github.cinnamondev.captureTheWool.woolCube.events.StateChangeEvent;
+import io.papermc.paper.event.block.BlockBreakBlockEvent;
 import net.kyori.adventure.bossbar.BossBar;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.JoinConfiguration;
@@ -25,8 +27,8 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
-import org.bukkit.event.block.BlockBreakEvent;
-import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.block.*;
+import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.world.ChunkUnloadEvent;
 
 import javax.annotation.Nullable;
@@ -102,6 +104,37 @@ public class WoolCube implements Listener {
         this.bossBar = BossBar.bossBar(this::displayName, 1, BossBar.Color.PURPLE, BossBar.Overlay.PROGRESS);
     }
     public WoolCubeSnapshot createSnapshot() { return new WoolCubeSnapshot(uuid, root, cubeState, displayName); }
+
+    @EventHandler
+    public void blockDestroyEvent(BlockDestroyEvent e) {
+        if (woolLocations.contains(e.getBlock().getLocation())) {
+            e.setCancelled(true);
+        }
+    }
+
+    @EventHandler
+    public void blockDestroyEvent(BlockBurnEvent e) {
+        if (woolLocations.contains(e.getBlock().getLocation())) {
+            e.setCancelled(true);
+        }
+    }
+
+    @EventHandler
+    public void blockSpreadPrevent(BlockSpreadEvent e) {
+        if (allSurroundingBlocks.contains(e.getBlock().getLocation())) {
+            e.setCancelled(true);
+        }
+    }
+
+    @EventHandler
+    public void blockExplodePrevent(EntityExplodeEvent e) {
+        e.blockList().removeIf(b -> woolLocations.contains(b.getLocation()));
+        //if (woolLocations.contains(e.getBlock().getLocation())) {
+        //    e.setCancelled(true);
+        //}
+    }
+
+
     @EventHandler
     public void playerBreakBlock(BlockBreakEvent e) {
         if (!woolLocations.contains(e.getBlock().getLocation())) {
@@ -174,7 +207,7 @@ public class WoolCube implements Listener {
         };
 
         if (updated) {
-            this.bossBar.progress(((float) getMaterialCountFor(originalMaterial) + diff)/25f);
+            this.bossBar.progress(Math.max(((float) getMaterialCountFor(originalMaterial) + diff)/25f,0f));
             e.getBlock().setType(m);
         } else {
             e.getBlock().setType(oldColour);
@@ -285,7 +318,7 @@ public class WoolCube implements Listener {
 
     @EventHandler
     public void preventBlockPlace(BlockPlaceEvent e) {
-        //if (e.getPlayer().hasPermission("ctw.bypass-wool-protection")) { return; }
+        if (e.getPlayer().hasPermission("ctw.bypass-wool-protection")) { return; }
         if (allSurroundingBlocks.contains(e.getBlock().getLocation())) {
             e.getPlayer().sendMessage(Component.text("You're gonna have to try a little harder than THAT."));
             e.setBuild(false);

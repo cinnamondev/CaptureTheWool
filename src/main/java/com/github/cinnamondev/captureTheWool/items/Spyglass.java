@@ -33,6 +33,7 @@ import org.bukkit.potion.PotionEffectType;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 public class Spyglass implements Listener, RecipeProvider<Recipe> {
     private static final NamespacedKey itemKey = NamespacedKey.fromString("ctw:spyglass/item");
@@ -86,6 +87,7 @@ public class Spyglass implements Listener, RecipeProvider<Recipe> {
 
     @EventHandler
     public void openDialogOnInteract(PlayerInteractEvent e) {
+        if (!e.getPlayer().hasPermission("ctw.spyglass.use")) { return; }
         if (e.getAction() != Action.RIGHT_CLICK_AIR) { return; }
         if (!Spyglass.isSpyglass(e.getPlayer().getInventory().getItemInMainHand())) {
             return;
@@ -107,7 +109,7 @@ public class Spyglass implements Listener, RecipeProvider<Recipe> {
         player.showDialog(dialog);
         return true;
     }
-    private static final Sound revealScare = Sound.sound(Key.key("ctw:reveal_doom"), Sound.Source.MASTER, 1f,1f);
+    public static final Sound revealScare = Sound.sound(Key.key("ctw:reveal_doom"), Sound.Source.MASTER, 1f,1f);
     @EventHandler
     public void dialogSubmitEvent(PlayerCustomClickEvent e) {
         if (!e.getIdentifier().equals(SpyTeamDialog.actionKey)) { return; }
@@ -158,22 +160,18 @@ public class Spyglass implements Listener, RecipeProvider<Recipe> {
                     spyglassReveal(cube, p, playerTeam);
                 }
 
+                Stream<Player> stream = switch (p.getConfig().getString("spyglass.glow.to", "PARTIES")) {
+                    case "ALL" -> p.getServer().getOnlinePlayers().stream().map(p -> (Player) p);
+                    case "PARTIES" -> Stream.concat(team.getOnlinePlayers(p), playerTeam.getOnlinePlayers(p));
+                    case "DEFENDERS" -> playerTeam.getOnlinePlayers(p);
+                    case null,default -> Stream.empty();
+                };
                 if (p.getConfig().getBoolean("spyglass.glow.on", false)) {
-                    p.getServer().getScheduler().runTaskLater(p, () -> team.getOnlinePlayers(p)
-                            .forEach(teamPlayer -> team.getOnlinePlayers(p)
-                                    .filter(otherTeamPlayer -> !teamPlayer.equals(otherTeamPlayer))
+                    p.getServer().getScheduler().runTaskLater(p, () -> stream
+                            .forEach(teamPlayer -> playerTeam.getOnlinePlayers(p)
                                     .forEach(enemy -> enemy
-                                            .sendPotionEffectChange(enemy, new PotionEffect(PotionEffectType.GLOWING, 1, 1))
+                                            .sendPotionEffectChange(enemy, new PotionEffect(PotionEffectType.GLOWING, p.getConfig().getInt("spyglass.glow.for", 200), 1))
                                     )), p.getConfig().getInt("spyglass.glow.after", 300));
-                    p.getServer().getScheduler().runTaskLater(p, () -> {
-                        team.getOnlinePlayers(p).forEach(teamPlayer -> {
-                            team.getOnlinePlayers(p)
-                                    .filter(otherTeamPlayer -> !teamPlayer.equals(otherTeamPlayer))
-                                    .forEach(enemy -> enemy
-                                            .sendPotionEffectChangeRemove(enemy, PotionEffectType.GLOWING)
-                                    );
-                        });
-                    }, p.getConfig().getInt("spyglass.glow.for", 200));
                 }
 
             case "DEFENDERS":
@@ -185,22 +183,15 @@ public class Spyglass implements Listener, RecipeProvider<Recipe> {
                 );
                 spyglassReveal(cube, p, playerTeam);
 
-                if (p.getConfig().getBoolean("spyglass.glow.on", false)) {
-                    p.getServer().getScheduler().runTaskLater(p, () -> {
-                        playerTeam.getOnlinePlayers(p).forEach(teamPlayer -> {
-                            team.getOnlinePlayers(p).forEach(enemy -> enemy
-                                    .sendPotionEffectChange(enemy, new PotionEffect(PotionEffectType.GLOWING, 1,1))
-                            );
-                        });
-                    }, p.getConfig().getInt("spyglass.glow.after", 300));
-                    p.getServer().getScheduler().runTaskLater(p, () -> {
-                        playerTeam.getOnlinePlayers(p).forEach(teamPlayer -> {
-                            team.getOnlinePlayers(p).forEach(enemy -> enemy
-                                    .sendPotionEffectChangeRemove(enemy, PotionEffectType.GLOWING)
-                            );
-                        });
-                    }, p.getConfig().getInt("spyglass.glow.for", 200));
-                }
+                //if (p.getConfig().getBoolean("spyglass.glow.on", false)) {
+                //    p.getServer().getScheduler().runTaskLater(p, () -> {
+                //        playerTeam.getOnlinePlayers(p).forEach(teamPlayer -> {
+                //            team.getOnlinePlayers(p).forEach(enemy -> enemy
+                //                    .sendPotionEffectChange(enemy, new PotionEffect(PotionEffectType.GLOWING, p.getConfig().getInt("spyglass.glow.for", 200),1))
+                //            );
+                //        });
+                //    }, p.getConfig().getInt("spyglass.glow.after", 300));
+                //}
 
         }
         player.getInventory().setItem(spyglassSlot, null);

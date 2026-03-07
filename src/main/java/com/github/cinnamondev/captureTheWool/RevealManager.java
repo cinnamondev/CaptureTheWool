@@ -26,10 +26,10 @@ public class RevealManager implements Listener {
 
     public RevealManager(Plugin p) {
         if (p.getConfig().getBoolean("wool-reveal.enabled", false)) {
-            ConfigurationSection cfg = p.getConfig().getConfigurationSection("wool-reveal.on");
+            ConfigurationSection cfg = p.getConfig().getConfigurationSection("wool-reveal.when");
             if (cfg != null) {
                 cfg.getKeys(false).forEach(str -> {
-                    Map.Entry<StateChangeEvent.Reason, Reach> reason = switch (str) {
+                    Map.Entry<StateChangeEvent.Reason, Reach> reason = switch (str.toUpperCase().trim()) {
                         case "CUBE_ATTACK" -> Map.entry(
                                 StateChangeEvent.Reason.AttackUnderway,
                                 Reach.valueOf(cfg.getString(str + ".to")));

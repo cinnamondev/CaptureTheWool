@@ -64,9 +64,10 @@ public class CtwCommand {
                                                     TeamMeta meta = ctx.getArgument("team", TeamMeta.class);
                                                     if (meta == null) { return Command.SINGLE_SUCCESS; }
                                                     Location loc = resolveLocation(ctx);
-                                                    p.findWoolCubeAt(loc, false).ifPresent(c ->
-                                                        c.updateCubeState(new CubeState.Claimed(meta, false), null)
-                                                    );
+                                                    p.findWoolCubeAt(loc, false).ifPresent(c -> {
+                                                        c.updateCubeState(new CubeState.Claimed(meta, false), null);
+                                                        c.spawnCube();
+                                                    });
                                                     return Command.SINGLE_SUCCESS;
                                                 })))
                                 .then(Commands.literal("save").executes(this::saveCubeExecutor))

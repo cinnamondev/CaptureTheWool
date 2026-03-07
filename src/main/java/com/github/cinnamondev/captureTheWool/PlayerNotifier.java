@@ -8,6 +8,7 @@ import com.github.cinnamondev.captureTheWool.items.RespawnCompass;
 import com.github.cinnamondev.captureTheWool.items.Spyglass;
 import com.google.common.collect.Iterables;
 import net.kyori.adventure.audience.Audience;
+import net.kyori.adventure.audience.ForwardingAudience;
 import net.kyori.adventure.key.Key;
 import net.kyori.adventure.sound.Sound;
 import net.kyori.adventure.text.Component;
@@ -90,28 +91,24 @@ public class PlayerNotifier implements Listener {
 
         TeamMeta oldClaimers = e.oldClaimers().get();
 
-        Iterable<Audience> attackPlayers = (Iterable<Audience>) e.newClaimers().audiences();
-        Iterable<Audience> defendPlayers = (Iterable<Audience>) e.oldClaimers().get().audiences();
+        //if (oldClaimers.countAliveTeammates(p) != 0) { return; }
 
-        if (oldClaimers.countAliveTeammates(p) != 0) { return; }
-
-        Iterable<Audience> audiences = switch (reach) {
-            case ALL -> (Iterable<Audience>) p.getServer().audiences();
-            case PARTIES -> Iterables.concat(attackPlayers,defendPlayers);
-            case DEFENDERS -> defendPlayers;
-            case ATTACKERS -> attackPlayers;
+        ForwardingAudience audience = switch (reach) {
+            case ALL -> p.getServer();
+            case PARTIES, ATTACKERS, DEFENDERS -> e.oldClaimers().get();
         };
 
-        audiences.forEach(a -> a.sendMessage(Component.empty()
+        audience.sendMessage(Component.empty()
                 .append(oldClaimers.name())
-                .append(Component.text(" has been eliminated by "))
+                .append(Component.text(" has lost their final cube to "))
                 .append(e.newClaimers().name())
-                .append(Component.text(" ! They will no longer be able to respawn!"))));
+                .append(Component.text(" ! They will no longer be able to respawn!")));
 
         if (reach == RevealManager.Reach.ALL || reach == RevealManager.Reach.PARTIES || reach == RevealManager.Reach.DEFENDERS) {
-            defendPlayers.forEach(a -> a.sendMessage(Component.empty()
+            e.oldClaimers().get().playSound(Spyglass.revealScare);
+            e.oldClaimers().get().sendMessage(Component.empty()
                     .append(e.newClaimers().name())
-                    .append(Component.text(" has taken your final cube! Act fast before total loss!"))));
+                    .append(Component.text(" has taken your final cube! Act fast before total loss!")));
         }
     }
 
