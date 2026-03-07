@@ -19,6 +19,10 @@ import io.papermc.paper.command.brigadier.argument.resolvers.BlockPositionResolv
 import io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver;
 import io.papermc.paper.math.BlockPosition;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.event.ClickEvent;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.Style;
+import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.command.CommandSender;
@@ -37,6 +41,7 @@ public class CtwCommand {
 
     public LiteralCommandNode<CommandSourceStack> command() {
         var cubeSubCommand = Commands.literal("cube")
+                .requires(src -> src.getSender().hasPermission("ctw.admin"))
                 .then(Commands.literal("create").then(Commands.argument("name", StringArgumentType.string())
                         .requires(src -> src.getSender() instanceof Player)
                         .then(Commands.argument("team", new TeamArgument())
@@ -82,6 +87,7 @@ public class CtwCommand {
                 );
 
         var compassCommand = Commands.literal("compass")
+                .requires(src -> src.getSender().hasPermission("ctw.admin"))
                 .then(Commands.literal("open")
                         .requires(src -> src.getExecutor() instanceof Player)
                         .executes(ctx -> {
@@ -103,6 +109,7 @@ public class CtwCommand {
                         })));
 
         var spyglassCommand = Commands.literal("spyglass")
+                .requires(src -> src.getSender().hasPermission("ctw.admin"))
                 .then(Commands.literal("open")
                         .requires(src -> src.getExecutor() instanceof Player)
                         .executes(ctx -> {
@@ -122,13 +129,16 @@ public class CtwCommand {
                             return Command.SINGLE_SUCCESS;
                         })));
         return Commands.literal("ctw")
-                .requires(src -> src.getSender().hasPermission("ctw.admin"))
-                .then(Commands.literal("reloadSave").executes(ctx -> {
+                .then(Commands.literal("reloadSave")
+                        .requires(src -> src.getSender().hasPermission("ctw.admin"))
+                        .executes(ctx -> {
                     p.loadSave();
                     p.loadCubes();
                     return Command.SINGLE_SUCCESS;
                 }))
-                .then(Commands.literal("saveGame").executes(ctx -> {
+                .then(Commands.literal("saveGame")
+                        .requires(src -> src.getSender().hasPermission("ctw.admin"))
+                        .executes(ctx -> {
                     if (CaptureTheWool.cubes.isEmpty()) { return Command.SINGLE_SUCCESS; }
                     var list = CaptureTheWool.cubes.stream().map(WoolCube::createSnapshot).toList();
                     p.getSave().set("cubes", list);
@@ -136,6 +146,7 @@ public class CtwCommand {
                     return Command.SINGLE_SUCCESS;
                 }))
                 .then(Commands.literal("teams")
+                        .requires(src -> src.getSender().hasPermission("ctw.admin"))
                         .then(Commands.literal("loadNormal").executes(ctx -> {
                             p.discoverTeams(false);
                             return Command.SINGLE_SUCCESS;
@@ -147,9 +158,17 @@ public class CtwCommand {
                 .then(compassCommand)
                 .then(spyglassCommand)
                 .then(cubeSubCommand)
+                .then(Commands.literal("about").executes(this::aboutCommandExecutor))
+                .executes(this::aboutCommandExecutor)
                 .build();
     }
 
+    int aboutCommandExecutor(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        ctx.getSource().getSender().sendMessage(Component.text("Capture The Wool by cinnamondev")
+                .style(Style.style(NamedTextColor.LIGHT_PURPLE, TextDecoration.BOLD))
+                .clickEvent(ClickEvent.openUrl("https://github.com/cinnamondev/CaptureTheWool")));
+        return Command.SINGLE_SUCCESS;
+    }
     private static final SimpleCommandExceptionType ERROR_CANT_RESOLVE_LOCATION = new SimpleCommandExceptionType(
             MessageComponentSerializer.message().serialize(Component.text("cant resolve location!"))
     );

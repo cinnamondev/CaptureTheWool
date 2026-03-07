@@ -129,21 +129,6 @@ public final class CaptureTheWool extends JavaPlugin {
 
     private @Nullable BossBar activeBar;
 
-    public void showMyBossBar(final Audience target) {
-        final Component name = Component.text("Awesome BossBar");
-        // Creates a red boss bar which has no progress and no notches
-        final BossBar emptyBar = BossBar.bossBar(name, 0.3f, BossBar.Color.RED, BossBar.Overlay.PROGRESS);
-        // Creates a green boss bar which has 50% progress and 10 notches
-        final BossBar halfBar = BossBar.bossBar(name, 0.5f, BossBar.Color.GREEN, BossBar.Overlay.NOTCHED_10);
-        // etc..
-        final BossBar fullBar = BossBar.bossBar(name, 1, BossBar.Color.BLUE, BossBar.Overlay.NOTCHED_20);
-
-        // Send a bossbar to your audience
-        target.showBossBar(emptyBar);
-
-        // Store it locally to be able to hide it manually later
-        this.activeBar = fullBar;
-    }
     @Override
     public void onEnable() {
         CubeState.registerConfiguration();

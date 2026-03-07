@@ -1,5 +1,6 @@
 package com.github.cinnamondev.captureTheWool.items;
 
+import com.destroystokyo.paper.event.player.PlayerStartSpectatingEntityEvent;
 import com.github.cinnamondev.captureTheWool.CaptureTheWool;
 import com.github.cinnamondev.captureTheWool.TeamMeta;
 import com.github.cinnamondev.captureTheWool.woolCube.CubeState;
@@ -214,6 +215,7 @@ public class RespawnCompass implements Listener, RecipeProvider<Recipe> {
     }
 
     private final HashMap<UUID, Pair<List<Integer>, Location>> respawnMap = new HashMap<>();
+    private final ArrayList<UUID> playersInRespawnCoolDown = new ArrayList<>();
     @EventHandler
     public void setRespawnPoint(PlayerDeathEvent e) {
 
@@ -263,7 +265,15 @@ public class RespawnCompass implements Listener, RecipeProvider<Recipe> {
             }
             // if after all that its not empty, send player fun message.
             if (!respawnCandidates.isEmpty()) {
-                e.getPlayer().sendMessage(Component.text("But it refused.").color(NamedTextColor.RED).decorate(TextDecoration.BOLD));
+                playersInRespawnCoolDown.add(e.getPlayer().getUniqueId());
+                e.getPlayer().setGameMode(GameMode.SPECTATOR);
+
+                e.getPlayer().sendActionBar(Component.text("Is it really that time again?"));
+                p.getServer().getScheduler().runTaskLater(p, () -> {
+                    e.getPlayer().setGameMode(GameMode.SURVIVAL);
+                    playersInRespawnCoolDown.remove(e.getPlayer().getUniqueId());
+                    e.getPlayer().sendMessage(Component.text("But it refused.").color(NamedTextColor.RED).decorate(TextDecoration.BOLD));
+                }, 10 * 20);
             }
         }
 
@@ -291,6 +301,15 @@ public class RespawnCompass implements Listener, RecipeProvider<Recipe> {
         p.getServer().getScheduler().runTaskLater(p, () -> e.getPlayer().spigot().respawn(), 1);
     }
 
+    @EventHandler
+    public void preventMoveDuringCoolDown(PlayerMoveEvent e) {
+        if (playersInRespawnCoolDown.contains(e.getPlayer().getUniqueId())) { e.setCancelled(true); }
+    }
+
+    @EventHandler
+    public void preventSpectatingProperlyDuringCooldown(PlayerStartSpectatingEntityEvent e) {
+        if (playersInRespawnCoolDown.contains(e.getPlayer().getUniqueId())) { e.setCancelled(true); }
+    }
     @EventHandler
     public void setRespawnLocation(PlayerRespawnEvent e) {
         Pair<List<Integer>, Location> p = respawnMap.get(e.getPlayer().getUniqueId());

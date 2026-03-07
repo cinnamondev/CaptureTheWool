@@ -171,14 +171,6 @@ public class PlayerNotifier implements Listener {
     }
 
     @EventHandler
-    public void discoverRecipes(PlayerJoinEvent e) {
-        e.getPlayer().discoverRecipe(RespawnCompass.recipeKey);
-        e.getPlayer().discoverRecipe(Spyglass.recipeKey);
-
-        p.showMyBossBar(e.getPlayer());
-    }
-
-    @EventHandler
     public void onDamage(CubeAttackEvent e) {
         TeamMeta claimer = e.newState().claimer();
         if (claimer != null) {

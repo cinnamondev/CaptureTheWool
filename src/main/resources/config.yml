@@ -56,7 +56,7 @@ spyglass:
             GOLD_INGOT, EMPTY,      EMPTY ]
   verbose-to-defenders: false # if defenders are told, will they be told which one? or will it just show ANY cube.
   glow:
-    on: false # attackers will start glowing once a reveal has happened.
+    on: true # attackers will start glowing once a reveal has happened.
     after: 200 # attackers start glowing after...
     for: 200 # for this time.
   reveal:
